@@ -13,11 +13,15 @@ interface CadastroDTO {
 
 export const authService = {
     login(dados: LoginDTO) {
-        return api.post("/login", dados);
+        return api.authPost("/login", dados);
     },
 
     cadastro(dados: CadastroDTO) {
-        return api.post("/cadastro", dados);
+        return api.authPost("/cadastro", dados);
+    },
+
+    aquecerApi() {
+        return api.get(`/health?warmup=${Date.now()}`);
     },
 
     logout() {

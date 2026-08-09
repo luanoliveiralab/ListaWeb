@@ -3,14 +3,15 @@ const API_URL =
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
     body?: unknown;
+    skipCsrf?: boolean;
 }
 
 async function request(endpoint: string, options: RequestOptions = {}) {
-    const { body, headers, ...rest } = options;
+    const { body, headers, skipCsrf = false, ...rest } = options;
     const metodo = (rest.method ?? "GET").toUpperCase();
     let csrfToken = typeof window !== "undefined" ? sessionStorage.getItem("csrfToken") : null;
 
-    if (!["GET", "HEAD", "OPTIONS"].includes(metodo) && !csrfToken) {
+    if (!["GET", "HEAD", "OPTIONS"].includes(metodo) && !skipCsrf && !csrfToken) {
         const csrfResponse = await fetch(`${API_URL}/csrf`, { credentials: "include" });
         if (!csrfResponse.ok) throw new Error("Não foi possível preparar a sessão segura.");
         const csrfData = await csrfResponse.json();
@@ -56,6 +57,13 @@ export const api = {
         request(endpoint, {
             method: "POST",
             body,
+        }),
+
+    authPost: (endpoint: string, body: unknown) =>
+        request(endpoint, {
+            method: "POST",
+            body,
+            skipCsrf: true,
         }),
 
     put: (endpoint: string, body: unknown) =>

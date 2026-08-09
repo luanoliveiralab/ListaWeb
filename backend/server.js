@@ -111,7 +111,7 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         const existe = await pool.query(
             `SELECT id
              FROM usuarios
-             WHERE LOWER(email) = LOWER($1)`,
+             WHERE email = $1`,
             [emailLimpo]
         );
 
@@ -195,7 +195,7 @@ app.post("/login", limitarTentativas(), async (req, res) => {
         const result = await pool.query(
             `SELECT id, nome, email, foto, senha, token_version
              FROM usuarios
-             WHERE LOWER(email) = LOWER($1)`,
+             WHERE email = $1`,
             [
                 email
                     .trim()

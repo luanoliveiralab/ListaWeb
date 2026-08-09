@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 import { authService } from "@/services/auth.service";
@@ -16,6 +16,10 @@ export default function CadastroPage() {
   const router = useRouter();
 
   const { mostrarAviso } = useToast();
+
+  useEffect(() => {
+    authService.aquecerApi().catch(() => undefined);
+  }, []);
 
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement>
