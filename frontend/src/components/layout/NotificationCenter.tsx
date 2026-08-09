@@ -11,20 +11,26 @@ interface Aviso { id: string; titulo: string; detalhe: string; tipo: "alerta" | 
 
 export default function NotificationCenter() {
   const [aberto, setAberto] = useState(false);
+  const [carregado, setCarregado] = useState(false);
   const [dados, setDados] = useState<{ movs: Movimentacao[]; metas: Meta[]; recorrencias: Recorrencia[]; orcamentos: Orcamento[] }>({ movs: [], metas: [], recorrencias: [], orcamentos: [] });
 
   useEffect(() => {
+    if (!aberto || carregado) return;
+
     let ativo = true;
     async function carregar() {
       try {
         const usuario = await api.get("/me");
         const hoje = new Date(); const mes = hoje.getMonth() + 1; const ano = hoje.getFullYear();
         const [movs, metas, recorrencias, orcamentos] = await Promise.all([api.get(`/financas/${usuario.id}`), api.get("/metas"), api.get("/recorrencias"), api.get(`/orcamentos/${usuario.id}?mes=${mes}&ano=${ano}`)]);
-        if (ativo) setDados({ movs, metas, recorrencias, orcamentos });
+        if (ativo) {
+          setDados({ movs, metas, recorrencias, orcamentos });
+          setCarregado(true);
+        }
       } catch { /* A página continua funcional mesmo sem os alertas. */ }
     }
     carregar(); return () => { ativo = false; };
-  }, []);
+  }, [aberto, carregado]);
 
   const avisos = useMemo(() => {
     const lista: Aviso[] = []; const hoje = new Date(); const dia = hoje.getDate(); const mes = hoje.getMonth(); const ano = hoje.getFullYear();

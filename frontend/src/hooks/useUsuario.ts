@@ -12,6 +12,19 @@ export function useUsuario() {
 
   useEffect(() => {
     let ativo = true;
+
+    const usuarioSalvo = localStorage.getItem("usuario");
+    if (usuarioSalvo) {
+      try {
+        const usuarioEmCache = JSON.parse(usuarioSalvo);
+        queueMicrotask(() => {
+          if (ativo) setUsuario(usuarioEmCache);
+        });
+      } catch {
+        localStorage.removeItem("usuario");
+      }
+    }
+
     authService.me()
       .then((usuarioAtual: Usuario) => {
         if (!ativo) return;

@@ -47,8 +47,10 @@ export default function Dashboard() {
 
         const usuarioId = usuario!.id;
 
-        const data = await listaService.buscarPorUsuario(usuarioId);
-        const movs = await financasService.buscarPorUsuario(usuarioId);
+        const [data, movs] = await Promise.all([
+          listaService.buscarPorUsuario(usuarioId),
+          financasService.buscarPorUsuario(usuarioId),
+        ]);
         setMovimentacoes(movs);
         setLista(data);
       } catch (err) {
