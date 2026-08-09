@@ -1,0 +1,10 @@
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "out"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://listaweb-api.onrender.com/:splat"
+  status = 200
+  force = true
