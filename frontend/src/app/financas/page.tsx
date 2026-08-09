@@ -1,0 +1,386 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import AppLayout from "@/components/layout/AppLayout";
+import FinanceCards from "@/components/financas/FinanceCards";
+import AddMovimentacaoForm from "@/components/financas/AddMovimentacaoForm";
+import FinanceTable from "@/components/financas/FinanceTable";
+
+import { useUsuario } from "@/hooks/useUsuario";
+import { financasService } from "@/services/financas.service";
+
+import type { Movimentacao } from "@/types/Movimentacao";
+
+import EditMovimentacaoModal from "@/components/financas/EditMovimentacaoModal";
+
+import FinancePieChart from "@/components/financas/FinancePieChart";
+
+import FinanceLineChart from "@/components/financas/FinanceLineChart";
+
+import PeriodSelector from "@/components/shared/PeriodSelector";
+
+import { usePeriod } from "@/context/PeriodContext";
+import { useToast } from "@/providers/ToastProvider";
+import BudgetPanel from "@/components/financas/BudgetPanel";
+import { orcamentosService } from "@/services/orcamentos.service";
+import type { Orcamento } from "@/types/Orcamento";
+import { planejamentoService } from "@/services/planejamento.service";
+
+export default function FinancasPage() {
+    const { usuario } = useUsuario();
+    const { mostrarAviso } = useToast();
+
+    const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
+    const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
+    const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
+    const [modalAberto, setModalAberto] = useState(false);
+
+    const [movimentacaoEditando, setMovimentacaoEditando] =
+        useState<Movimentacao | null>(null);
+
+    const [movimentacaoExcluir, setMovimentacaoExcluir] =
+        useState<Movimentacao | null>(null);
+
+    const [modalExcluir, setModalExcluir] = useState(false);
+
+    const [loading, setLoading] = useState(true);
+
+    const [tipo, setTipo] = useState<"receita" | "despesa">("receita");
+    const [descricao, setDescricao] = useState("");
+    const [valor, setValor] = useState("");
+    const [categoria, setCategoria] = useState("");
+    const [data, setData] = useState(
+        new Date().toISOString().split("T")[0]
+    );
+
+    const {
+        mes,
+        ano,
+        setMes,
+        setAno,
+    } = usePeriod();
+
+    // =========================
+    // CARREGAR MOVIMENTAÇÕES
+    // =========================
+    useEffect(() => {
+        if (!usuario?.id) return;
+
+        async function load() {
+            try {
+                setLoading(true);
+
+                const usuarioId = usuario!.id;
+
+                await planejamentoService.gerarRecorrencias(mes, ano);
+                const data = await financasService.buscarPorUsuario(usuarioId);
+                setMovimentacoes(data);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        load();
+    }, [ano, mes, usuario]);
+
+    useEffect(() => {
+        if (!usuario?.id) return;
+
+        orcamentosService.buscar(usuario.id, mes, ano)
+            .then(setOrcamentos)
+            .catch((err) => {
+                console.error(err);
+                mostrarAviso("Não foi possível carregar os orçamentos.", "erro");
+            });
+    }, [ano, mes, mostrarAviso, usuario]);
+
+    async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
+        const salvo = await orcamentosService.salvar({
+            categoria: categoriaOrcamento,
+            valor: valorOrcamento,
+            mes,
+            ano,
+        });
+
+        setOrcamentos((atuais) => {
+            const existe = atuais.some((item) => item.id === salvo.id);
+            return existe
+                ? atuais.map((item) => item.id === salvo.id ? salvo : item)
+                : [...atuais, salvo].sort((a, b) => a.categoria.localeCompare(b.categoria));
+        });
+        mostrarAviso("Orçamento salvo com sucesso!");
+    }
+
+    async function removerOrcamento(id: number) {
+        await orcamentosService.remover(id);
+        setOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
+        mostrarAviso("Orçamento removido.");
+    }
+
+    // =========================
+    // ADICIONAR
+    // =========================
+    async function adicionarMovimentacao() {
+        if (!usuario) return;
+        const valorNumero = Number(valor.replace(",", "."));
+
+        if (!descricao || isNaN(valorNumero) || valorNumero <= 0 || !categoria) {
+            mostrarAviso("Preencha todos os campos.", "erro");
+            return;
+        }
+
+        try {
+            const nova = await financasService.adicionar({
+                usuario_id: usuario.id,
+                tipo,
+                descricao,
+                valor: valorNumero,
+                categoria,
+                data,
+            });
+
+            setMovimentacoes((prev) => [nova, ...prev]);
+
+            setTipo("receita");
+            setDescricao("");
+            setValor("");
+            setCategoria("");
+            setData(new Date().toISOString().split("T")[0]);
+
+            mostrarAviso("Movimentação adicionada com sucesso!");
+        } catch (err) {
+            console.error(err);
+            mostrarAviso("Erro ao adicionar movimentação.", "erro");
+        }
+    }
+
+    // =========================
+    // EXCLUIR
+    // =========================
+
+    function abrirModalExcluir(movimentacao: Movimentacao) {
+        setMovimentacaoExcluir(movimentacao);
+        setModalExcluir(true);
+    }
+
+    async function excluirMovimentacao(id: number) {
+
+        try {
+            await financasService.remover(id);
+
+            setMovimentacoes((prev) =>
+                prev.filter((mov) => mov.id !== id)
+            );
+            mostrarAviso("Movimentação excluída com sucesso!");
+        } catch (err) {
+            console.error(err);
+            mostrarAviso("Erro ao excluir movimentação.", "erro");
+        }
+    }
+
+    // =========================
+    // EDITAR
+    // =========================
+    async function salvarEdicao(mov: Movimentacao) {
+        try {
+            const atualizada = await financasService.atualizar(mov.id, {
+                tipo: mov.tipo,
+                descricao: mov.descricao,
+                valor: mov.valor,
+                categoria: mov.categoria,
+                data: mov.data,
+            });
+
+            setMovimentacoes((prev) =>
+                prev.map((m) =>
+                    m.id === atualizada.id ? atualizada : m
+                )
+            );
+
+            setModalAberto(false);
+            setMovimentacaoEditando(null);
+            mostrarAviso("Movimentação atualizada com sucesso!");
+        } catch (err) {
+            console.error(err);
+            mostrarAviso("Erro ao atualizar movimentação.", "erro");
+        }
+    }
+
+    function editarMovimentacao(mov: Movimentacao) {
+        setMovimentacaoEditando(mov);
+        setModalAberto(true);
+    }
+
+    if (!usuario) {
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                Carregando...
+            </div>
+        );
+    }
+
+    // =========================
+    // RESUMO FINANCEIRO
+    // =========================
+    const movimentacoesFiltradas = movimentacoes.filter((mov) => {
+        const data = new Date(mov.data);
+
+        return (
+            data.getMonth() + 1 === mes &&
+            data.getFullYear() === ano
+        );
+    });
+
+    const receitas = movimentacoesFiltradas
+        .filter((m) => m.tipo === "receita")
+        .reduce((total, m) => total + Number(m.valor), 0);
+
+    const despesas = movimentacoesFiltradas
+        .filter((m) => m.tipo === "despesa")
+        .reduce((total, m) => total + Number(m.valor), 0);
+
+    const saldo = receitas - despesas;
+
+    const dataMesAnterior = new Date(ano, mes - 2, 1);
+    const mesAnterior = dataMesAnterior.getMonth() + 1;
+    const anoAnterior = dataMesAnterior.getFullYear();
+    const movimentacoesAnteriores = movimentacoes.filter((mov) => {
+        const [anoMov, mesMov] = mov.data.slice(0, 10).split("-").map(Number);
+        return mesMov === mesAnterior && anoMov === anoAnterior;
+    });
+    const receitasAnteriores = movimentacoesAnteriores
+        .filter((mov) => mov.tipo === "receita")
+        .reduce((total, mov) => total + Number(mov.valor), 0);
+    const despesasAnteriores = movimentacoesAnteriores
+        .filter((mov) => mov.tipo === "despesa")
+        .reduce((total, mov) => total + Number(mov.valor), 0);
+
+    return (
+        <AppLayout
+            titulo="Finanças"
+            subtitulo="Gerencie suas receitas e despesas."
+            nome={usuario.nome}
+        >
+            <FinanceCards
+                saldo={saldo}
+                receitas={receitas}
+                despesas={despesas}
+                anterior={{
+                    receitas: receitasAnteriores,
+                    despesas: despesasAnteriores,
+                    saldo: receitasAnteriores - despesasAnteriores,
+                }}
+            />
+
+            <PeriodSelector
+                mes={mes}
+                ano={ano}
+                onMesChange={setMes}
+                onAnoChange={setAno}
+            />
+
+            <div className="mt-6 grid gap-6 xl:grid-cols-2">
+                <FinancePieChart
+                    movimentacoes={movimentacoesFiltradas}
+                    categoriaSelecionada={categoriaSelecionada}
+                    onCategoriaSelect={setCategoriaSelecionada}
+                />
+                <FinanceLineChart
+                    movimentacoes={movimentacoes}
+                />
+            </div>
+
+            <BudgetPanel
+                orcamentos={orcamentos}
+                movimentacoes={movimentacoesFiltradas}
+                onSalvar={salvarOrcamento}
+                onRemover={removerOrcamento}
+            />
+
+            <AddMovimentacaoForm
+                tipo={tipo}
+                setTipo={setTipo}
+                descricao={descricao}
+                setDescricao={setDescricao}
+                valor={valor}
+                setValor={setValor}
+                categoria={categoria}
+                setCategoria={setCategoria}
+                data={data}
+                setData={setData}
+                adicionarMovimentacao={adicionarMovimentacao}
+            />
+
+            <FinanceTable
+                movimentacoes={movimentacoesFiltradas}
+                loading={loading}
+                categoriaSelecionada={categoriaSelecionada}
+                onCategoriaChange={setCategoriaSelecionada}
+                onEditar={editarMovimentacao}
+                onExcluir={(id) => {
+                    const movimentacao = movimentacoes.find(
+                        (mov) => mov.id === id
+                    );
+
+                    if (movimentacao) {
+                        abrirModalExcluir(movimentacao);
+                    }
+                }}
+            />
+
+            {modalExcluir && movimentacaoExcluir && (
+                <div className="modal-backdrop">
+                    <div className="modal-panel max-w-md">
+
+                        <h2 className="text-xl font-bold">
+                            Excluir movimentação?
+                        </h2>
+
+                        <p className="mt-2 text-muted-foreground">
+                            Tem certeza que deseja excluir “{movimentacaoExcluir.descricao}”?
+                        </p>
+
+                        <div className="modal-actions">
+
+                            <button
+                                onClick={() => {
+                                    setModalExcluir(false);
+                                    setMovimentacaoExcluir(null);
+                                }}
+                                className="button-secondary"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                onClick={async () => {
+                                    await excluirMovimentacao(movimentacaoExcluir.id);
+                                    setModalExcluir(false);
+                                    setMovimentacaoExcluir(null);
+                                }}
+                                className="button-danger"
+                            >
+                                Excluir
+                            </button>
+
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <EditMovimentacaoModal
+                key={movimentacaoEditando?.id ?? "fechado"}
+                aberto={modalAberto}
+                movimentacao={movimentacaoEditando}
+                onSalvar={salvarEdicao}
+                onFechar={() => {
+                    setModalAberto(false);
+                    setMovimentacaoEditando(null);
+                }}
+            />
+        </AppLayout>
+    );
+}

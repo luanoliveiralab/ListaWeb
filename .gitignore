@@ -1,0 +1,11 @@
+**/node_modules/
+**/.next/
+**/coverage/
+**/.env
+**/.env.local
+**/.env.*.local
+backend/backups/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vercel/
