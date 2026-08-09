@@ -21,6 +21,7 @@ test.after(async () => {
 test("health confirma comunicação com o banco", async () => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
     assert.equal((await response.json()).status, "ok");
 });
 

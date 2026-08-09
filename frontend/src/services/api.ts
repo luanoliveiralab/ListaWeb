@@ -1,5 +1,6 @@
 const API_URL =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+let csrfEmAndamento: Promise<string> | null = null;
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
     body?: unknown;
@@ -12,11 +13,15 @@ async function request(endpoint: string, options: RequestOptions = {}) {
     let csrfToken = typeof window !== "undefined" ? sessionStorage.getItem("csrfToken") : null;
 
     if (!["GET", "HEAD", "OPTIONS"].includes(metodo) && !skipCsrf && !csrfToken) {
-        const csrfResponse = await fetch(`${API_URL}/csrf`, { credentials: "include" });
-        if (!csrfResponse.ok) throw new Error("Não foi possível preparar a sessão segura.");
-        const csrfData = await csrfResponse.json();
-        csrfToken = csrfData.csrfToken;
-        sessionStorage.setItem("csrfToken", csrfToken ?? "");
+        csrfEmAndamento ??= fetch(`${API_URL}/csrf`, { credentials: "include" })
+            .then(async (csrfResponse) => {
+                if (!csrfResponse.ok) throw new Error("Não foi possível preparar a sessão segura.");
+                const csrfData = await csrfResponse.json();
+                sessionStorage.setItem("csrfToken", csrfData.csrfToken);
+                return csrfData.csrfToken as string;
+            })
+            .finally(() => { csrfEmAndamento = null; });
+        csrfToken = await csrfEmAndamento;
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {

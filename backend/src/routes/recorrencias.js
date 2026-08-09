@@ -59,7 +59,17 @@ router.post("/gerar", async (req, res, next) => {
              RETURNING *`,
             [req.usuarioId, ano, mes]
         );
-        return res.json({ geradas: result.rowCount, movimentacoes: result.rows });
+        const movimentacoes = await pool.query(
+            `SELECT m.*, l.quantidade AS quantidade
+             FROM movimentacoes m
+             LEFT JOIN listas l ON l.movimentacao_id = m.id
+             WHERE m.usuario_id = $1
+               AND m.data >= make_date($2, $3, 1)
+               AND m.data < make_date($2, $3, 1) + INTERVAL '1 month'
+             ORDER BY m.data DESC, m.id DESC`,
+            [req.usuarioId, ano, mes]
+        );
+        return res.json({ geradas: result.rowCount, movimentacoes: movimentacoes.rows });
     } catch (error) { return next(error); }
 });
 

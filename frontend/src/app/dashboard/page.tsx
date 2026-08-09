@@ -39,7 +39,7 @@ export default function Dashboard() {
     if (!usuario?.id) return;
 
     async function load() {
-      const cacheKey = `dashboard:${usuario!.id}`;
+      const cacheKey = `dashboard:${usuario!.id}:${ano}-${mes}`;
       const cache = sessionStorage.getItem(cacheKey);
 
       if (cache) {
@@ -54,7 +54,7 @@ export default function Dashboard() {
       }
 
       try {
-        const dados = await dashboardService.buscar();
+        const dados = await dashboardService.buscar(mes, ano);
         setLista(dados.lista);
         setMovimentacoes(dados.movimentacoes);
         sessionStorage.setItem(cacheKey, JSON.stringify(dados));
@@ -66,7 +66,7 @@ export default function Dashboard() {
     }
 
     load();
-  }, [usuario]);
+  }, [ano, mes, usuario]);
 
   if (!usuario || loading) {
     return (

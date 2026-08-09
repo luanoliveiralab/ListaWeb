@@ -71,11 +71,8 @@ export default function FinancasPage() {
             try {
                 setLoading(true);
 
-                const usuarioId = usuario!.id;
-
-                await planejamentoService.gerarRecorrencias(mes, ano);
-                const data = await financasService.buscarPorUsuario(usuarioId);
-                setMovimentacoes(data);
+                const resposta = await planejamentoService.gerarRecorrencias(mes, ano);
+                setMovimentacoes(resposta.movimentacoes);
             } catch (err) {
                 console.error(err);
             } finally {

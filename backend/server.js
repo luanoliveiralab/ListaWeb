@@ -48,6 +48,10 @@ app.use(
 );
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use((req, res, next) => {
+    res.set("Cache-Control", "private, no-store");
+    next();
+});
 app.use(express.json({ limit: "4mb" }));
 
 app.get("/csrf", (req, res) => {
@@ -1283,6 +1287,15 @@ app.delete(
 // =====================================================
 
 app.get("/dashboard", autenticar, async (req, res) => {
+    const hoje = new Date();
+    const mes = Number(req.query.mes ?? hoje.getMonth() + 1);
+    const ano = Number(req.query.ano ?? hoje.getFullYear());
+
+    if (!Number.isInteger(mes) || mes < 1 || mes > 12 ||
+        !Number.isInteger(ano) || ano < 2000 || ano > 2200) {
+        return res.status(400).json({ mensagem: "Período inválido." });
+    }
+
     try {
         const [lista, movimentacoes] = await Promise.all([
             pool.query(
@@ -1291,8 +1304,10 @@ app.get("/dashboard", autenticar, async (req, res) => {
                     comprado, movimentacao_id, created_at
                  FROM listas
                  WHERE usuario_id = $1
+                   AND created_at >= make_date($2, $3, 1)
+                   AND created_at < make_date($2, $3, 1) + INTERVAL '1 month'
                  ORDER BY id DESC`,
-                [req.usuarioId]
+                [req.usuarioId, ano, mes]
             ),
             pool.query(
                 `SELECT
@@ -1301,8 +1316,10 @@ app.get("/dashboard", autenticar, async (req, res) => {
                  FROM movimentacoes m
                  LEFT JOIN listas l ON l.movimentacao_id = m.id
                  WHERE m.usuario_id = $1
+                   AND m.data >= make_date($2, $3, 1)
+                   AND m.data < make_date($2, $3, 1) + INTERVAL '1 month'
                  ORDER BY m.data DESC, m.id DESC`,
-                [req.usuarioId]
+                [req.usuarioId, ano, mes]
             ),
         ]);
 

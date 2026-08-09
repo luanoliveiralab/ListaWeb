@@ -62,6 +62,7 @@ export default function CadastroPage() {
         "usuario",
         JSON.stringify(data.usuario)
       );
+      sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
 
       router.replace("/dashboard");
     } catch (err: unknown) {

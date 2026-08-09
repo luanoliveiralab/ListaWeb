@@ -25,10 +25,16 @@ export function useUsuario() {
       }
     }
 
+    const ultimaValidacao = Number(sessionStorage.getItem("usuarioValidadoEm"));
+    if (usuarioSalvo && Date.now() - ultimaValidacao < 60_000) {
+      return () => { ativo = false; };
+    }
+
     authService.me()
       .then((usuarioAtual: Usuario) => {
         if (!ativo) return;
         localStorage.setItem("usuario", JSON.stringify(usuarioAtual));
+        sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
         setUsuario(usuarioAtual);
       })
       .catch(() => {

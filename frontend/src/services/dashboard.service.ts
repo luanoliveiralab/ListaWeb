@@ -8,7 +8,7 @@ export interface DashboardData {
 }
 
 export const dashboardService = {
-  buscar(): Promise<DashboardData> {
-    return api.get("/dashboard");
+  buscar(mes: number, ano: number): Promise<DashboardData> {
+    return api.get(`/dashboard?mes=${mes}&ano=${ano}`);
   },
 };
