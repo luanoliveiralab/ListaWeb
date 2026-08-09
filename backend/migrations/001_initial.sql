@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS meta_movimentacoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS cartoes (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    nome VARCHAR(80) NOT NULL,
+    instituicao VARCHAR(80) NOT NULL,
+    limite_disponivel NUMERIC(12, 2) NOT NULL CHECK (limite_disponivel >= 0),
+    dia_vencimento SMALLINT NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 31),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
     ON movimentacoes(usuario_id, data DESC);
 CREATE INDEX IF NOT EXISTS idx_listas_usuario
@@ -102,5 +112,6 @@ CREATE INDEX IF NOT EXISTS idx_recorrencias_usuario ON recorrencias(usuario_id, 
 CREATE INDEX IF NOT EXISTS idx_metas_usuario ON metas(usuario_id, concluida);
 CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario ON recuperacoes_senha(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_meta_movimentacoes_meta ON meta_movimentacoes(meta_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

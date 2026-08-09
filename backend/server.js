@@ -6,8 +6,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 const crypto = require("node:crypto");
-const nodemailer = require("nodemailer");
 const { pool, verificarConexao } = require("./src/db");
+const { enviarEmailRecuperacao } = require("./src/email");
 const { autenticar } = require("./src/middleware/autenticar");
 const { cookieOptions, csrfCookieOptions, criarTokenCsrf, protegerCsrf, limitarTentativas, limparTentativas } = require("./src/security");
 const recorrenciasRouter = require("./src/routes/recorrencias");
@@ -294,23 +294,11 @@ app.post("/esqueci-senha", limitarTentativas({ limite: 4, janelaMs: 30 * 60 * 10
         );
 
         const link = `${process.env.FRONTEND_URL || "http://localhost:3000"}/redefinir-senha?token=${token}`;
-        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: Number(process.env.SMTP_PORT || 587),
-                secure: process.env.SMTP_SECURE === "true",
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-            });
-            await transporter.sendMail({
-                from: process.env.SMTP_FROM || "ListaWeb <nao-responda@listaweb.app>",
-                to: usuario.email,
-                subject: "Redefinição de senha — ListaWeb",
-                text: `Olá, ${usuario.nome}. Redefina sua senha em até 30 minutos: ${link}`,
-                html: `<p>Olá, ${usuario.nome}.</p><p>Recebemos uma solicitação para redefinir sua senha.</p><p><a href="${link}">Criar nova senha</a></p><p>Este link expira em 30 minutos.</p>`,
-            });
-        } else if (process.env.NODE_ENV !== "production") {
-            console.log(`Link de recuperação (desenvolvimento): ${link}`);
-        }
+        await enviarEmailRecuperacao({
+            destinatario: usuario.email,
+            nome: usuario.nome,
+            link,
+        });
         return res.json(resposta);
     } catch (err) {
         console.error("Erro ao solicitar recuperação:", err);
@@ -2113,6 +2101,68 @@ app.put(
 // =====================================================
 // ROTA DE TESTE
 // =====================================================
+
+app.get("/cartoes", autenticar, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT * FROM cartoes
+             WHERE usuario_id = $1
+             ORDER BY created_at DESC, id DESC`,
+            [req.usuarioId]
+        );
+        return res.json(result.rows);
+    } catch (err) {
+        console.error("Erro ao buscar cartões:", err);
+        return res.status(500).json({ mensagem: "Erro ao buscar cartões." });
+    }
+});
+
+app.post("/cartoes", autenticar, async (req, res) => {
+    const { nome, instituicao, limite_disponivel, dia_vencimento } = req.body;
+    const limite = Number(limite_disponivel);
+    const vencimento = Number(dia_vencimento);
+
+    if (
+        typeof nome !== "string" || !nome.trim() || nome.trim().length > 80 ||
+        typeof instituicao !== "string" || !instituicao.trim() || instituicao.trim().length > 80 ||
+        !Number.isFinite(limite) || limite < 0 ||
+        !Number.isInteger(vencimento) || vencimento < 1 || vencimento > 31
+    ) {
+        return res.status(400).json({ mensagem: "Dados do cartão inválidos." });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO cartoes (usuario_id, nome, instituicao, limite_disponivel, dia_vencimento)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [req.usuarioId, nome.trim(), instituicao.trim(), limite, vencimento]
+        );
+        return res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error("Erro ao adicionar cartão:", err);
+        return res.status(500).json({ mensagem: "Erro ao adicionar cartão." });
+    }
+});
+
+app.delete("/cartoes/:id", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ mensagem: "ID do cartão inválido." });
+    }
+
+    try {
+        const result = await pool.query(
+            "DELETE FROM cartoes WHERE id = $1 AND usuario_id = $2 RETURNING id",
+            [id, req.usuarioId]
+        );
+        if (!result.rowCount) return res.status(404).json({ mensagem: "Cartão não encontrado." });
+        return res.json({ mensagem: "Cartão removido." });
+    } catch (err) {
+        console.error("Erro ao remover cartão:", err);
+        return res.status(500).json({ mensagem: "Erro ao remover cartão." });
+    }
+});
 
 app.use("/recorrencias", recorrenciasRouter);
 app.use("/metas", metasRouter);

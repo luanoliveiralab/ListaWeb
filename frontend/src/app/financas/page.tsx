@@ -26,6 +26,9 @@ import BudgetPanel from "@/components/financas/BudgetPanel";
 import { orcamentosService } from "@/services/orcamentos.service";
 import type { Orcamento } from "@/types/Orcamento";
 import { planejamentoService } from "@/services/planejamento.service";
+import CreditCardsPanel from "@/components/financas/CreditCardsPanel";
+import { cartoesService } from "@/services/cartoes.service";
+import type { Cartao } from "@/types/Cartao";
 
 export default function FinancasPage() {
     const { usuario } = useUsuario();
@@ -33,6 +36,8 @@ export default function FinancasPage() {
 
     const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
     const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
+    const [cartoes, setCartoes] = useState<Cartao[]>([]);
+    const [carregandoCartoes, setCarregandoCartoes] = useState(true);
     const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
     const [modalAberto, setModalAberto] = useState(false);
 
@@ -93,6 +98,46 @@ export default function FinancasPage() {
                 mostrarAviso("Não foi possível carregar os orçamentos.", "erro");
             });
     }, [ano, mes, mostrarAviso, usuario]);
+
+    useEffect(() => {
+        if (!usuario?.id) return;
+
+        cartoesService.listar()
+            .then(setCartoes)
+            .catch((err) => {
+                console.error(err);
+                mostrarAviso("Não foi possível carregar os cartões.", "erro");
+            })
+            .finally(() => setCarregandoCartoes(false));
+    }, [mostrarAviso, usuario?.id]);
+
+    async function adicionarCartao(dados: {
+        nome: string;
+        instituicao: string;
+        limite_disponivel: number;
+        dia_vencimento: number;
+    }) {
+        try {
+            const novo = await cartoesService.adicionar(dados);
+            setCartoes((atuais) => [novo, ...atuais]);
+            mostrarAviso("Cartão adicionado com sucesso!");
+        } catch (err) {
+            console.error(err);
+            mostrarAviso("Não foi possível adicionar o cartão.", "erro");
+            throw err;
+        }
+    }
+
+    async function removerCartao(id: number) {
+        try {
+            await cartoesService.remover(id);
+            setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== id));
+            mostrarAviso("Cartão removido.");
+        } catch (err) {
+            console.error(err);
+            mostrarAviso("Não foi possível remover o cartão.", "erro");
+        }
+    }
 
     async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
         const salvo = await orcamentosService.salvar({
@@ -295,6 +340,13 @@ export default function FinancasPage() {
                 movimentacoes={movimentacoesFiltradas}
                 onSalvar={salvarOrcamento}
                 onRemover={removerOrcamento}
+            />
+
+            <CreditCardsPanel
+                cartoes={cartoes}
+                carregando={carregandoCartoes}
+                onAdicionar={adicionarCartao}
+                onRemover={removerCartao}
             />
 
             <AddMovimentacaoForm
