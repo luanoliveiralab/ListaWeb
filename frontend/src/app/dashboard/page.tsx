@@ -7,11 +7,8 @@ import Welcome from "@/components/layout/Welcome";
 import DashboardCards from "@/components/dashboard/DashboardCards";
 
 import { useUsuario } from "@/hooks/useUsuario";
-import { listaService } from "@/services/lista.service";
-
 import type { ItemLista } from "@/types/ItemLista";
-
-import { financasService } from "@/services/financas.service";
+import { dashboardService, type DashboardData } from "@/services/dashboard.service";
 
 import type { Movimentacao } from "@/types/Movimentacao";
 
@@ -42,17 +39,25 @@ export default function Dashboard() {
     if (!usuario?.id) return;
 
     async function load() {
+      const cacheKey = `dashboard:${usuario!.id}`;
+      const cache = sessionStorage.getItem(cacheKey);
+
+      if (cache) {
+        try {
+          const dados: DashboardData = JSON.parse(cache);
+          setLista(dados.lista);
+          setMovimentacoes(dados.movimentacoes);
+          setLoading(false);
+        } catch {
+          sessionStorage.removeItem(cacheKey);
+        }
+      }
+
       try {
-        setLoading(true);
-
-        const usuarioId = usuario!.id;
-
-        const [data, movs] = await Promise.all([
-          listaService.buscarPorUsuario(usuarioId),
-          financasService.buscarPorUsuario(usuarioId),
-        ]);
-        setMovimentacoes(movs);
-        setLista(data);
+        const dados = await dashboardService.buscar();
+        setLista(dados.lista);
+        setMovimentacoes(dados.movimentacoes);
+        sessionStorage.setItem(cacheKey, JSON.stringify(dados));
       } catch (err) {
         console.error(err);
       } finally {

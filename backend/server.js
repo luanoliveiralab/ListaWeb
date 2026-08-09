@@ -1282,6 +1282,42 @@ app.delete(
 // FINANÇAS / MOVIMENTAÇÕES
 // =====================================================
 
+app.get("/dashboard", autenticar, async (req, res) => {
+    try {
+        const [lista, movimentacoes] = await Promise.all([
+            pool.query(
+                `SELECT
+                    id, nome, quantidade, categoria, valor,
+                    comprado, movimentacao_id, created_at
+                 FROM listas
+                 WHERE usuario_id = $1
+                 ORDER BY id DESC`,
+                [req.usuarioId]
+            ),
+            pool.query(
+                `SELECT
+                    m.*,
+                    l.quantidade AS quantidade
+                 FROM movimentacoes m
+                 LEFT JOIN listas l ON l.movimentacao_id = m.id
+                 WHERE m.usuario_id = $1
+                 ORDER BY m.data DESC, m.id DESC`,
+                [req.usuarioId]
+            ),
+        ]);
+
+        return res.json({
+            lista: lista.rows,
+            movimentacoes: movimentacoes.rows,
+        });
+    } catch (err) {
+        console.error("Erro ao carregar dashboard:", err);
+        return res.status(500).json({
+            mensagem: "Erro ao carregar dashboard.",
+        });
+    }
+});
+
 // =====================================================
 // LISTAR MOVIMENTAÇÕES
 // =====================================================
