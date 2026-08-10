@@ -14,10 +14,10 @@ import BudgetPanel from "@/components/financas/BudgetPanel";
 import PeriodSelector from "@/components/shared/PeriodSelector";
 import { orcamentosService } from "@/services/orcamentos.service";
 import { usePeriod } from "@/context/PeriodContext";
+import { useCategorias } from "@/hooks/useCategorias";
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numeroMoeda = (valor: string) => Number(valor.includes(",") ? valor.replace(/\./g, "").replace(",", ".") : valor);
-const categorias = ["Mercado", "Moradia", "Transporte", "Saúde", "Educação", "Lazer", "Salário", "Freelance", "Investimentos", "Outros"];
 
 export default function PlanejamentoPage() {
   const { usuario } = useUsuario();
@@ -25,6 +25,7 @@ export default function PlanejamentoPage() {
   const { mes, ano, setMes, setAno } = usePeriod();
   const queryClient = useQueryClient();
   const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
+  const { categorias } = useCategorias(rec.tipo as "receita" | "despesa");
   const [meta, setMeta] = useState({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [historico, setHistorico] = useState<MetaMovimentacao[]>([]);
@@ -164,7 +165,7 @@ export default function PlanejamentoPage() {
             <div className="field-group"><label className="field-label" htmlFor="tipo-recorrencia">Tipo</label><select id="tipo-recorrencia" className="control" value={rec.tipo} onChange={(e) => setRec({ ...rec, tipo: e.target.value })}><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
             <div className="field-group"><label className="field-label" htmlFor="descricao-recorrencia">Descrição</label><input id="descricao-recorrencia" className="control" placeholder="Ex.: Aluguel" value={rec.descricao} onChange={(e) => setRec({ ...rec, descricao: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="valor-recorrencia">Valor (R$)</label><input id="valor-recorrencia" className="control" placeholder="R$ 0,00" inputMode="decimal" value={rec.valor} onChange={(e) => setRec({ ...rec, valor: e.target.value })} required /></div>
-            <div className="field-group"><label className="field-label" htmlFor="categoria-recorrencia">Categoria</label><select id="categoria-recorrencia" className="control" value={rec.categoria} onChange={(e) => setRec({ ...rec, categoria: e.target.value })} required><option value="" disabled>Selecionar categoria</option>{categorias.map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}</select></div>
+            <div className="field-group"><label className="field-label" htmlFor="categoria-recorrencia">Categoria</label><select id="categoria-recorrencia" className="control" value={rec.categoria} onChange={(e) => setRec({ ...rec, categoria: e.target.value })} required><option value="" disabled>Selecionar categoria</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.nome}>{categoria.nome}</option>)}</select></div>
             <div className="field-group"><label className="field-label" htmlFor="dia-recorrencia">Dia do lançamento</label><input id="dia-recorrencia" className="control" type="number" min="1" max="28" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></div>
             <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" }); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Adicionar recorrência</button></div>
           </form>}

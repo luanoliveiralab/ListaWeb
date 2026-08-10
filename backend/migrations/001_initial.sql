@@ -112,6 +112,17 @@ CREATE TABLE IF NOT EXISTS cartoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS categorias (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    nome VARCHAR(80) NOT NULL,
+    tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('receita', 'despesa')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_categorias_usuario_nome_tipo
+    ON categorias(usuario_id, LOWER(nome), tipo);
+
 CREATE TABLE IF NOT EXISTS faturas_cartao (
     id SERIAL PRIMARY KEY,
     cartao_id INTEGER NOT NULL REFERENCES cartoes(id) ON DELETE CASCADE,

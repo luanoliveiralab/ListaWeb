@@ -26,6 +26,10 @@ async function prepararApi(page: Page) {
       });
     }
     if (pathname === "/me") return responderJson(route, usuario);
+    if (pathname === "/categorias") return responderJson(route, [
+      { id: 1, nome: "Mercado", tipo: "despesa", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { id: 2, nome: "Salário", tipo: "receita", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    ]);
     if (pathname === "/csrf") return responderJson(route, { csrfToken: "csrf-teste" });
     return responderJson(route, { mensagem: "API de teste" });
   });
@@ -38,6 +42,14 @@ test("exibe os acessos públicos da tela de login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "ListaWeb" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute("href", "/esqueci-senha");
   await expect(page.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/cadastro");
+  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/sobre");
+});
+
+test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page }) => {
+  await page.goto("/sobre");
+  await expect(page.getByRole("heading", { name: /Mais clareza/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Etapas do projeto" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "É 100% gratuito?" })).toBeVisible();
 });
 
 test("mostra o aviso retornado quando o login falha", async ({ page }) => {

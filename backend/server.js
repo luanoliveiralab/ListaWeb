@@ -15,6 +15,7 @@ const { cookieOptions, csrfCookieOptions, criarTokenCsrf, protegerCsrf, limitarT
 const recorrenciasRouter = require("./src/routes/recorrencias");
 const metasRouter = require("./src/routes/metas");
 const cartoesRouter = require("./src/routes/cartoes");
+const categoriasRouter = require("./src/routes/categorias");
 const { criarContextoRequisicao, rotaNaoEncontrada, tratarErro } = require("./src/http");
 
 const app = express();
@@ -2249,6 +2250,7 @@ app.put(
 // =====================================================
 
 app.use("/cartoes", cartoesRouter);
+app.use("/categorias", categoriasRouter);
 app.use("/recorrencias", recorrenciasRouter);
 app.use("/metas", metasRouter);
 

@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Movimentacao } from "@/types/Movimentacao";
 import type { Cartao } from "@/types/Cartao";
 import { useToast } from "@/providers/ToastProvider";
+import { useCategorias } from "@/hooks/useCategorias";
 
 interface Props {
     aberto: boolean;
@@ -42,6 +43,7 @@ export default function EditMovimentacaoModal({
     );
     const [formaPagamento, setFormaPagamento] = useState<"saldo" | "credito">(movimentacao?.forma_pagamento ?? "saldo");
     const [cartaoId, setCartaoId] = useState(movimentacao?.cartao_id ? String(movimentacao.cartao_id) : "");
+    const { categorias } = useCategorias(tipo);
 
     const { mostrarAviso } = useToast();
 
@@ -128,30 +130,6 @@ export default function EditMovimentacaoModal({
 
         onSalvar(dados);
     }
-
-    const categoriasReceita = [
-        "Salário",
-        "Freelance",
-        "Investimentos",
-        "Vendas",
-        "Outros",
-    ];
-
-    const categoriasDespesa = [
-        "Mercado",
-        "Padaria",
-        "Carnes",
-        "Bebidas",
-        "Farmácia",
-        "Limpeza",
-        "Higiene",
-        "Outros",
-    ];
-
-    const categorias =
-        tipo === "receita"
-            ? categoriasReceita
-            : categoriasDespesa;
 
     return (
         <div className="modal-backdrop">
@@ -299,13 +277,14 @@ export default function EditMovimentacaoModal({
                                 Selecionar categoria
                             </option>
 
+                            {!categorias.some((item) => item.nome === categoria) && categoria && <option value={categoria}>{categoria}</option>}
                             {categorias.map(
                                 (categoriaItem) => (
                                     <option
-                                        key={categoriaItem}
-                                        value={categoriaItem}
+                                        key={categoriaItem.id}
+                                        value={categoriaItem.nome}
                                     >
-                                        {categoriaItem}
+                                        {categoriaItem.nome}
                                     </option>
                                 )
                             )}

@@ -38,6 +38,11 @@ test("rota privada rejeita acesso sem sessão", async () => {
     assert.equal(response.status, 401);
 });
 
+test("categorias globais ficam isoladas por sessão", async () => {
+    const response = await fetch(`${baseUrl}/categorias`);
+    assert.equal(response.status, 401);
+});
+
 test("login não revela se o e-mail existe", async () => {
     const response = await fetch(`${baseUrl}/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: `inexistente-${Date.now()}@teste.local`, senha: "senha-inexistente-segura" }) });
     assert.equal(response.status, 401);

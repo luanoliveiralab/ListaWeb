@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { Cartao } from "@/types/Cartao";
+import { useCategorias } from "@/hooks/useCategorias";
 
 interface Props {
   tipo: "receita" | "despesa";
@@ -32,6 +33,7 @@ export default function AddMovimentacaoForm({
 }: Props) {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const { categorias } = useCategorias(tipo);
 
   async function salvar(event: React.FormEvent) {
     event.preventDefault();
@@ -69,7 +71,7 @@ export default function AddMovimentacaoForm({
             {tipo === "despesa" && formaPagamento === "credito" && <><div><label className="field-label">Cartão</label><select value={cartaoId} onChange={(event) => setCartaoId(event.target.value)} className="control mt-2" required><option value="">Selecionar cartão</option>{cartoes.map((cartao) => <option key={cartao.id} value={cartao.id}>{cartao.nome} · {cartao.instituicao}</option>)}</select></div><div><label className="field-label">Parcelas</label><select value={parcelas} onChange={(event) => setParcelas(event.target.value)} className="control mt-2">{Array.from({ length: 24 }, (_, indice) => indice + 1).map((quantidade) => <option key={quantidade} value={quantidade}>{quantidade === 1 ? "À vista" : `${quantidade}x`}</option>)}</select>{Number(parcelas) > 1 && valor && <p className="mt-1 text-xs text-muted-foreground">Aproximadamente {(Number(valor.replace(",", ".")) / Number(parcelas)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} por mês</p>}</div></>}
 
             <div><label className="field-label">Valor (R$)</label><input type="text" inputMode="decimal" placeholder="R$ 0,00" value={valor} onChange={(event) => setValor(event.target.value)} className="control mt-2" /></div>
-            <div><label className="field-label">Categoria</label><select value={categoria} onChange={(event) => setCategoria(event.target.value)} className="control mt-2"><option value="" disabled>Selecionar categoria</option>{tipo === "receita" ? <><option value="Salário">Salário</option><option value="Freelance">Freelance</option><option value="Investimentos">Investimentos</option><option value="Vendas">Vendas</option><option value="Outros">Outros</option></> : <><option value="Mercado">Mercado</option><option value="Padaria">Padaria</option><option value="Carnes">Carnes</option><option value="Bebidas">Bebidas</option><option value="Farmácia">Farmácia</option><option value="Limpeza">Limpeza</option><option value="Higiene">Higiene</option><option value="Outros">Outros</option></>}</select></div>
+            <div><label className="field-label">Categoria</label><select value={categoria} onChange={(event) => setCategoria(event.target.value)} className="control mt-2"><option value="" disabled>Selecionar categoria</option>{categorias.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}</select></div>
             <div><label className="field-label">Data</label><input type="date" value={data} onChange={(event) => setData(event.target.value)} className="control mt-2 [color-scheme:light] dark:[color-scheme:dark]" /></div>
           </div>
 

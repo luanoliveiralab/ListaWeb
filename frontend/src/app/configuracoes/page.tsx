@@ -1,15 +1,19 @@
 "use client";
 
-import { MoonStar, Palette, Sun } from "lucide-react";
+import { Info, MoonStar, Palette, Sun, Tags } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 import AppLayout from "@/components/layout/AppLayout";
 import { Switch } from "@/components/ui/switch";
 import { useUsuario } from "@/hooks/useUsuario";
 import { useTheme } from "@/providers/ThemeProvider";
+import CategoryManagerModal from "@/components/configuracoes/CategoryManagerModal";
 
 export default function ConfiguracoesPage() {
   const { temaEscuro, alterarTema } = useTheme();
   const { usuario } = useUsuario();
+  const [categoriasAbertas, setCategoriasAbertas] = useState(false);
 
   return (
     <AppLayout
@@ -45,6 +49,11 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
       </section>
+      <section className="surface mt-6 p-5 sm:p-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><Tags size={21} /></span><div><h2 className="text-xl font-semibold">Categorias</h2><p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">Crie e organize as categorias disponíveis em todo o ListaWeb.</p></div></div><button type="button" onClick={() => setCategoriasAbertas(true)} className="button-primary">Gerenciar categorias</button></div>
+      </section>
+      <CategoryManagerModal aberto={categoriasAbertas} onFechar={() => setCategoriasAbertas(false)} />
+      <section className="surface mt-6 p-5 sm:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600"><Info size={21} /></span><div><h2 className="text-xl font-semibold">Sobre o ListaWeb</h2><p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">Conheça o propósito, as fases e quem está construindo o projeto.</p></div></div><Link href="/sobre" className="button-secondary">Conhecer o projeto</Link></div></section>
     </AppLayout>
   );
 }

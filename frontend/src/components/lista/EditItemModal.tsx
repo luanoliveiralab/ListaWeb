@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { ItemLista } from "@/types/ItemLista";
 import { useToast } from "@/providers/ToastProvider";
+import { useCategorias } from "@/hooks/useCategorias";
 
 interface Props {
     aberto: boolean;
@@ -30,6 +31,7 @@ export default function EditItemModal({
     );
 
     const { mostrarAviso } = useToast();
+    const { categorias } = useCategorias("despesa");
 
     if (!aberto || !item) return null;
 
@@ -180,37 +182,8 @@ export default function EditItemModal({
                                 Selecionar categoria
                             </option>
 
-                            <option value="Mercado">
-                                Mercado
-                            </option>
-
-                            <option value="Padaria">
-                                Padaria
-                            </option>
-
-                            <option value="Carnes">
-                                Carnes
-                            </option>
-
-                            <option value="Bebidas">
-                                Bebidas
-                            </option>
-
-                            <option value="Farmácia">
-                                Farmácia
-                            </option>
-
-                            <option value="Limpeza">
-                                Limpeza
-                            </option>
-
-                            <option value="Higiene">
-                                Higiene
-                            </option>
-
-                            <option value="Outros">
-                                Outros
-                            </option>
+                            {!categorias.some((item) => item.nome === categoria) && categoria && <option value={categoria}>{categoria}</option>}
+                            {categorias.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}
                         </select>
                     </div>
 
