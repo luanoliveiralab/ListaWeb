@@ -81,7 +81,7 @@ Não inclua senhas, dados bancários ou informações financeiras reais.
 
 - Sugestão: aplicar um template responsivo e alinhado à marca aos e-mails enviados pela API.
 - Classificação: melhoria de experiência de prioridade média.
-- Situação: backlog.
+- Situação: implementado em 10/08/2026 para confirmação de cadastro e redefinição de senha, com HTML responsivo e versão em texto simples.
 
 ### F09 — Categorias disponíveis por página — 10/08/2026
 
