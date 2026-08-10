@@ -284,7 +284,9 @@ app.post("/esqueci-senha", limitarTentativas({ limite: 4, janelaMs: 30 * 60 * 10
 
     try {
         const usuarioResult = await pool.query("SELECT id, nome, email FROM usuarios WHERE LOWER(email) = LOWER($1)", [email]);
-        if (!usuarioResult.rowCount) return res.json(resposta);
+        if (!usuarioResult.rowCount) {
+            return res.status(404).json({ mensagem: "E-mail não cadastrado." });
+        }
 
         const usuario = usuarioResult.rows[0];
         const token = crypto.randomBytes(32).toString("hex");
