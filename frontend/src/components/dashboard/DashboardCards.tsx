@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDownRight, ArrowUpRight, CheckCircle2, Clock3, CreditCard,
+  ArrowDownRight, ArrowUpRight, CheckCircle2, Clock3,
   Receipt, ShoppingCart, TrendingUp, Wallet,
 } from "lucide-react";
 
@@ -22,6 +22,13 @@ interface DashboardCardsProps {
 }
 
 const moeda = (valor: number) => valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const siglas: Record<string, string> = {
+  Nubank: "NU", Itaú: "ITAÚ", Bradesco: "BRA", Santander: "SAN",
+  "Banco do Brasil": "BB", Caixa: "CAIXA", Inter: "INTER", "C6 Bank": "C6",
+  PicPay: "PICPAY", "Mercado Pago": "MP", Neon: "NEON",
+};
+const siglaInstituicao = (instituicao: string) => siglas[instituicao] ?? instituicao
+  .split(/\s+/).map((parte) => parte[0]).join("").slice(0, 5).toUpperCase();
 
 export default function DashboardCards({
   total, comprados, pendentes, saldo, receitas, despesas, movimentacoes,
@@ -78,7 +85,9 @@ export default function DashboardCards({
               <p className="mt-2 truncate text-2xl font-semibold tracking-tight tabular-nums">{cartaoAtual ? moeda(creditoDisponivel) : "Nenhum cartão"}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">{cartaoAtual ? `${cartaoAtual.nome} · Fatura ${moeda(faturaAtual)}` : "Cadastre um cartão em Finanças"}</p>
             </div>
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600"><CreditCard size={21} /></span>
+            <span className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 px-2 text-xs font-bold tracking-tight text-violet-600">
+              {cartaoAtual ? siglaInstituicao(cartaoAtual.instituicao) : "CARD"}
+            </span>
           </div>
           {cartoes.length > 1 && (
             <div className="mt-3 flex gap-1" aria-label={`${indiceCartao % cartoes.length + 1} de ${cartoes.length} cartões`}>
