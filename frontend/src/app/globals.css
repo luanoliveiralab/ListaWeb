@@ -138,7 +138,7 @@
   }
 
   .page-enter {
-    animation: page-enter 180ms ease-out both;
+    animation: page-enter 180ms ease-out backwards;
   }
 
   .page-loader {
