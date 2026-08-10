@@ -168,17 +168,17 @@ export default function FinancasPage() {
     // ADICIONAR
     // =========================
     async function adicionarMovimentacao() {
-        if (!usuario) return;
+        if (!usuario) return false;
         const valorNumero = Number(valor.replace(",", "."));
 
         if (!descricao || isNaN(valorNumero) || valorNumero <= 0 || !categoria) {
             mostrarAviso("Preencha todos os campos.", "erro");
-            return;
+            return false;
         }
 
         if (tipo === "despesa" && formaPagamento === "credito" && !cartaoId) {
             mostrarAviso("Selecione o cartão utilizado.", "erro");
-            return;
+            return false;
         }
 
         try {
@@ -204,9 +204,11 @@ export default function FinancasPage() {
             setData(new Date().toISOString().split("T")[0]);
 
             mostrarAviso("Movimentação adicionada com sucesso!");
+            return true;
         } catch (err) {
             console.error(err);
             mostrarAviso("Erro ao adicionar movimentação.", "erro");
+            return false;
         }
     }
 
