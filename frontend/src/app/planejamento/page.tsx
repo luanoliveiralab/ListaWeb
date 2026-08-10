@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { CalendarClock, CheckCircle2, Pause, Play, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useUsuario } from "@/hooks/useUsuario";
@@ -33,30 +33,89 @@ export default function PlanejamentoPage() {
   const [movimento, setMovimento] = useState({ tipo: "deposito", valor: "", observacao: "" });
   const [recorrenciaAberta, setRecorrenciaAberta] = useState(false);
   const [metaAberta, setMetaAberta] = useState(false);
+  const planejamentoCarregadoRef = useRef("");
+  const periodoCarregadoRef = useRef("");
 
   useEffect(() => {
     if (!usuario) return;
-    Promise.all([planejamentoService.buscarRecorrencias(), planejamentoService.buscarMetas()])
-      .then(([listaRecorrencias, listaMetas]) => {
+    async function carregarPlanejamento() {
+      const cacheKey = `planejamento:${usuario!.id}`;
+      const cache = sessionStorage.getItem(cacheKey);
+      if (cache) {
+        try {
+          const dados = JSON.parse(cache) as { recorrencias: Recorrencia[]; metas: Meta[] };
+          setRecorrencias(dados.recorrencias);
+          setMetas(dados.metas);
+          planejamentoCarregadoRef.current = cacheKey;
+        } catch {
+          sessionStorage.removeItem(cacheKey);
+        }
+      }
+
+      try {
+        const [listaRecorrencias, listaMetas] = await Promise.all([
+          planejamentoService.buscarRecorrencias(),
+          planejamentoService.buscarMetas(),
+        ]);
         setRecorrencias(listaRecorrencias);
         setMetas(listaMetas);
-      })
-      .catch(() => mostrarAviso("Não foi possível carregar o planejamento.", "erro"));
+        planejamentoCarregadoRef.current = cacheKey;
+        sessionStorage.setItem(cacheKey, JSON.stringify({ recorrencias: listaRecorrencias, metas: listaMetas }));
+      } catch {
+        mostrarAviso("Não foi possível carregar o planejamento.", "erro");
+      }
+    }
+
+    carregarPlanejamento();
   }, [mostrarAviso, usuario]);
+
+  useEffect(() => {
+    const cacheKey = usuario?.id ? `planejamento:${usuario.id}` : "";
+    if (cacheKey && planejamentoCarregadoRef.current === cacheKey) {
+      sessionStorage.setItem(cacheKey, JSON.stringify({ recorrencias, metas }));
+    }
+  }, [metas, recorrencias, usuario?.id]);
 
   useEffect(() => {
     if (!usuario?.id) return;
 
-    Promise.all([
-      orcamentosService.buscar(usuario.id, mes, ano),
-      planejamentoService.gerarRecorrencias(mes, ano),
-    ])
-      .then(([listaOrcamentos, resposta]) => {
+    async function carregarPeriodo() {
+      const cacheKey = `planejamento-periodo:${usuario!.id}:${ano}-${mes}`;
+      const cache = sessionStorage.getItem(cacheKey);
+      if (cache) {
+        try {
+          const dados = JSON.parse(cache) as { orcamentos: Orcamento[]; movimentacoes: Movimentacao[] };
+          setOrcamentos(dados.orcamentos);
+          setMovimentacoes(dados.movimentacoes);
+          periodoCarregadoRef.current = cacheKey;
+        } catch {
+          sessionStorage.removeItem(cacheKey);
+        }
+      }
+
+      try {
+        const [listaOrcamentos, resposta] = await Promise.all([
+          orcamentosService.buscar(usuario!.id, mes, ano),
+          planejamentoService.gerarRecorrencias(mes, ano),
+        ]);
         setOrcamentos(listaOrcamentos);
         setMovimentacoes(resposta.movimentacoes);
-      })
-      .catch(() => mostrarAviso("Não foi possível carregar os orçamentos.", "erro"));
-  }, [ano, mes, mostrarAviso, usuario?.id]);
+        periodoCarregadoRef.current = cacheKey;
+        sessionStorage.setItem(cacheKey, JSON.stringify({ orcamentos: listaOrcamentos, movimentacoes: resposta.movimentacoes }));
+      } catch {
+        mostrarAviso("Não foi possível carregar os orçamentos.", "erro");
+      }
+    }
+
+    carregarPeriodo();
+  }, [ano, mes, mostrarAviso, usuario]);
+
+  useEffect(() => {
+    const cacheKey = usuario?.id ? `planejamento-periodo:${usuario.id}:${ano}-${mes}` : "";
+    if (cacheKey && periodoCarregadoRef.current === cacheKey) {
+      sessionStorage.setItem(cacheKey, JSON.stringify({ orcamentos, movimentacoes }));
+    }
+  }, [ano, mes, movimentacoes, orcamentos, usuario?.id]);
 
   async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
     const salvo = await orcamentosService.salvar({ categoria: categoriaOrcamento, valor: valorOrcamento, mes, ano });
