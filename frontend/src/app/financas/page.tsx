@@ -286,7 +286,8 @@ export default function FinancasPage() {
         .filter((m) => m.tipo === "receita")
         .reduce((total, m) => total + Number(m.valor), 0);
 
-    const despesas = movimentacoesFiltradas
+    const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id);
+    const despesas = movimentacoesAnaliticas
         .filter((m) => m.tipo === "despesa")
         .reduce((total, m) => total + Number(m.valor), 0);
 
@@ -306,6 +307,7 @@ export default function FinancasPage() {
         .filter((mov) => mov.tipo === "receita")
         .reduce((total, mov) => total + Number(mov.valor), 0);
     const despesasAnteriores = movimentacoesAnteriores
+        .filter((mov) => !mov.fatura_pagamento_id)
         .filter((mov) => mov.tipo === "despesa")
         .reduce((total, mov) => total + Number(mov.valor), 0);
     const despesasSaldoAnteriores = movimentacoesAnteriores
@@ -338,12 +340,12 @@ export default function FinancasPage() {
 
             <div className="mt-6 grid gap-6 xl:grid-cols-2">
                 <FinancePieChart
-                    movimentacoes={movimentacoesFiltradas}
+                    movimentacoes={movimentacoesAnaliticas}
                     categoriaSelecionada={categoriaSelecionada}
                     onCategoriaSelect={setCategoriaSelecionada}
                 />
                 <FinanceLineChart
-                    movimentacoes={movimentacoes}
+                    movimentacoes={movimentacoesAnaliticas}
                 />
             </div>
 

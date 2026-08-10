@@ -2337,6 +2337,104 @@ app.get("/cartoes/:id/faturas/:ano/:mes", autenticar, async (req, res) => {
     }
 });
 
+app.post("/cartoes/:id/faturas/:ano/:mes/fechar", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    const ano = Number(req.params.ano);
+    const mes = Number(req.params.mes);
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(ano) || ano < 2000 || ano > 2200 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ mensagem: "Período da fatura inválido." });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [id, req.usuarioId]);
+        if (!cartao.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ mensagem: "Cartão não encontrado." }); }
+        const total = await client.query(
+            `SELECT COALESCE(SUM(valor), 0)::numeric(12,2) AS total, COUNT(*)::int AS quantidade
+             FROM movimentacoes WHERE usuario_id = $1 AND cartao_id = $2 AND tipo = 'despesa'
+               AND forma_pagamento = 'credito' AND EXTRACT(YEAR FROM data) = $3 AND EXTRACT(MONTH FROM data) = $4`,
+            [req.usuarioId, id, ano, mes]
+        );
+        if (!total.rows[0].quantidade) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Não há compras para fechar nesta fatura." }); }
+        const fatura = await client.query(
+            `INSERT INTO faturas_cartao (cartao_id, usuario_id, ano, mes, status, fechada_em)
+             VALUES ($1,$2,$3,$4,'fechada',NOW())
+             ON CONFLICT (cartao_id, ano, mes) DO UPDATE
+             SET status = 'fechada', fechada_em = NOW(), updated_at = NOW()
+             WHERE faturas_cartao.status = 'aberta'
+             RETURNING *`,
+            [id, req.usuarioId, ano, mes]
+        );
+        if (!fatura.rowCount) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Esta fatura já foi fechada ou paga." }); }
+        await client.query("COMMIT");
+        return res.json({ ...fatura.rows[0], total: total.rows[0].total, quantidade: total.rows[0].quantidade });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("Erro ao fechar fatura:", err);
+        return res.status(500).json({ mensagem: "Erro ao fechar fatura." });
+    } finally { client.release(); }
+});
+
+app.post("/cartoes/:id/faturas/:ano/:mes/pagar", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    const ano = Number(req.params.ano);
+    const mes = Number(req.params.mes);
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(ano) || ano < 2000 || ano > 2200 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ mensagem: "Período da fatura inválido." });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const fatura = await client.query(
+            `SELECT f.*, c.nome AS cartao_nome FROM faturas_cartao f
+             JOIN cartoes c ON c.id = f.cartao_id
+             WHERE f.cartao_id = $1 AND f.usuario_id = $2 AND f.ano = $3 AND f.mes = $4 FOR UPDATE`,
+            [id, req.usuarioId, ano, mes]
+        );
+        if (!fatura.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ mensagem: "Feche a fatura antes de pagá-la." }); }
+        if (fatura.rows[0].status === "paga") { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Esta fatura já foi paga." }); }
+        if (fatura.rows[0].status !== "fechada") { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "A fatura precisa estar fechada para o pagamento." }); }
+        const total = await client.query(
+            `SELECT COALESCE(SUM(valor), 0)::numeric(12,2) AS total FROM movimentacoes
+             WHERE usuario_id = $1 AND cartao_id = $2 AND tipo = 'despesa' AND forma_pagamento = 'credito'
+               AND EXTRACT(YEAR FROM data) = $3 AND EXTRACT(MONTH FROM data) = $4`,
+            [req.usuarioId, id, ano, mes]
+        );
+        const valor = Number(total.rows[0].total);
+        if (!(valor > 0)) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "A fatura não possui valor para pagamento." }); }
+        const saldo = await client.query(
+            `SELECT COALESCE(SUM(CASE
+                WHEN tipo = 'receita' THEN valor
+                WHEN tipo = 'despesa' AND forma_pagamento = 'saldo' THEN -valor
+                ELSE 0 END), 0)::numeric(12,2) AS valor
+             FROM movimentacoes WHERE usuario_id = $1`,
+            [req.usuarioId]
+        );
+        if (Number(saldo.rows[0].valor) < valor) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensagem: "Saldo insuficiente para pagar esta fatura." });
+        }
+        const pagamento = await client.query(
+            `INSERT INTO movimentacoes (usuario_id, tipo, descricao, valor, categoria, data, forma_pagamento, fatura_pagamento_id)
+             VALUES ($1,'despesa',$2,$3,'Pagamento de fatura',CURRENT_DATE,'saldo',$4) RETURNING *`,
+            [req.usuarioId, `Pagamento da fatura ${fatura.rows[0].cartao_nome} ${String(mes).padStart(2, "0")}/${ano}`, valor, fatura.rows[0].id]
+        );
+        const atualizada = await client.query(
+            `UPDATE faturas_cartao SET status = 'paga', paga_em = NOW(), pagamento_movimentacao_id = $1, updated_at = NOW()
+             WHERE id = $2 RETURNING *`,
+            [pagamento.rows[0].id, fatura.rows[0].id]
+        );
+        await client.query("COMMIT");
+        return res.json({ fatura: atualizada.rows[0], pagamento: pagamento.rows[0] });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("Erro ao pagar fatura:", err);
+        return res.status(500).json({ mensagem: "Erro ao pagar fatura." });
+    } finally { client.release(); }
+});
+
 app.delete("/cartoes/:id", autenticar, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {

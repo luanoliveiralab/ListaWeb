@@ -18,4 +18,5 @@ export interface Movimentacao {
     forma_pagamento?: "saldo" | "credito";
     cartao_id?: number | null;
     cartao_nome?: string | null;
+    fatura_pagamento_id?: number | null;
 }

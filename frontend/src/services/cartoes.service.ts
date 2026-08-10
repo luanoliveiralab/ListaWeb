@@ -9,4 +9,6 @@ export const cartoesService = {
   listarFaturas: (id: number): Promise<FaturaCartao[]> => api.get(`/cartoes/${id}/faturas`),
   detalharFatura: (id: number, ano: number, mes: number): Promise<ItemFaturaCartao[]> =>
     api.get(`/cartoes/${id}/faturas/${ano}/${mes}`),
+  fecharFatura: (id: number, ano: number, mes: number) => api.post(`/cartoes/${id}/faturas/${ano}/${mes}/fechar`, {}),
+  pagarFatura: (id: number, ano: number, mes: number) => api.post(`/cartoes/${id}/faturas/${ano}/${mes}/pagar`, {}),
 };

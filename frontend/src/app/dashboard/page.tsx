@@ -81,7 +81,8 @@ export default function Dashboard() {
     .filter((mov) => mov.tipo === "receita")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
 
-  const despesas = movimentacoesFiltradas
+  const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id);
+  const despesas = movimentacoesAnaliticas
     .filter((mov) => mov.tipo === "despesa")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
 
@@ -130,11 +131,11 @@ export default function Dashboard() {
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
 
         <FinancePieChart
-          movimentacoes={movimentacoesFiltradas}
+          movimentacoes={movimentacoesAnaliticas}
         />
 
         <FinanceLineChart
-          movimentacoes={movimentacoesFiltradas}
+          movimentacoes={movimentacoesAnaliticas}
         />
 
       </div>

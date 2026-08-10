@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Building2, CreditCard, Plus, ReceiptText, Trash2, Wifi, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Cartao } from "@/types/Cartao";
 import type { Movimentacao } from "@/types/Movimentacao";
 import type { FaturaCartao } from "@/types/Cartao";
 import { cartoesService } from "@/services/cartoes.service";
+import { useToast } from "@/providers/ToastProvider";
 
 interface Props {
   cartoes: Cartao[];
@@ -45,6 +46,8 @@ const padrao = { fundo: "from-slate-600 via-slate-700 to-slate-900", sigla: "CAR
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, onAdicionar, onRemover }: Props) {
+  const queryClient = useQueryClient();
+  const { mostrarAviso } = useToast();
   const [nome, setNome] = useState("");
   const [instituicao, setInstituicao] = useState("");
   const [outraInstituicao, setOutraInstituicao] = useState("");
@@ -55,6 +58,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [cartaoFaturas, setCartaoFaturas] = useState<Cartao | null>(null);
   const [faturaSelecionada, setFaturaSelecionada] = useState<FaturaCartao | null>(null);
+  const [alterandoFatura, setAlterandoFatura] = useState(false);
   const faturasQuery = useQuery({
     queryKey: ["faturas", cartaoFaturas?.id],
     queryFn: () => cartoesService.listarFaturas(cartaoFaturas!.id),
@@ -67,6 +71,26 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   });
 
   const instituicaoFinal = instituicao === "Outra instituição" ? outraInstituicao.trim() : instituicao;
+
+  async function alterarStatusFatura(acao: "fechar" | "pagar") {
+    if (!cartaoFaturas || !faturaSelecionada) return;
+    setAlterandoFatura(true);
+    try {
+      if (acao === "fechar") await cartoesService.fecharFatura(cartaoFaturas.id, faturaSelecionada.ano, faturaSelecionada.mes);
+      else await cartoesService.pagarFatura(cartaoFaturas.id, faturaSelecionada.ano, faturaSelecionada.mes);
+      await queryClient.invalidateQueries({ queryKey: ["faturas", cartaoFaturas.id] });
+      await queryClient.invalidateQueries({ queryKey: ["financas"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      const faturas = await cartoesService.listarFaturas(cartaoFaturas.id);
+      queryClient.setQueryData(["faturas", cartaoFaturas.id], faturas);
+      setFaturaSelecionada(faturas.find((item) => item.ano === faturaSelecionada.ano && item.mes === faturaSelecionada.mes) ?? null);
+      mostrarAviso(acao === "fechar" ? "Fatura fechada com sucesso." : "Fatura paga pelo saldo.");
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "Não foi possível atualizar a fatura.", "erro");
+    } finally {
+      setAlterandoFatura(false);
+    }
+  }
 
   async function salvar(event: React.FormEvent) {
     event.preventDefault();
@@ -214,7 +238,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
               </div>
 
               <div className="min-h-64 rounded-2xl border border-border bg-muted/20 p-4">
-                {!faturaSelecionada ? <div className="flex h-full min-h-56 items-center justify-center text-center text-sm text-muted-foreground">Selecione uma fatura para visualizar as compras.</div> : detalheQuery.isPending ? <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">Carregando compras...</div> : <><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-muted-foreground">Total da fatura</p><strong className="text-xl tabular-nums">{moeda.format(Number(faturaSelecionada.total))}</strong></div><span className="text-xs text-muted-foreground">{faturaSelecionada.quantidade} lançamentos</span></div><div className="max-h-72 divide-y divide-border overflow-y-auto">{detalheQuery.data?.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.descricao}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.categoria} · {new Date(`${item.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</p></div><strong className="shrink-0 text-sm tabular-nums">{moeda.format(Number(item.valor))}</strong></div>)}{!detalheQuery.data?.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</p>}</div></>}
+                {!faturaSelecionada ? <div className="flex h-full min-h-56 items-center justify-center text-center text-sm text-muted-foreground">Selecione uma fatura para visualizar as compras.</div> : detalheQuery.isPending ? <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">Carregando compras...</div> : <><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-muted-foreground">Total da fatura</p><strong className="text-xl tabular-nums">{moeda.format(Number(faturaSelecionada.total))}</strong></div><span className="text-xs text-muted-foreground">{faturaSelecionada.quantidade} lançamentos</span></div><div className="max-h-64 divide-y divide-border overflow-y-auto">{detalheQuery.data?.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.descricao}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.categoria} · {new Date(`${item.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</p></div><strong className="shrink-0 text-sm tabular-nums">{moeda.format(Number(item.valor))}</strong></div>)}{!detalheQuery.data?.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</p>}</div>{faturaSelecionada.status !== "paga" && <div className="mt-4 flex justify-end border-t border-border pt-4"><button type="button" disabled={alterandoFatura || !faturaSelecionada.quantidade} onClick={() => alterarStatusFatura(faturaSelecionada.status === "aberta" ? "fechar" : "pagar")} className="button-primary">{alterandoFatura ? "Processando..." : faturaSelecionada.status === "aberta" ? "Fechar fatura" : "Pagar pelo saldo"}</button></div>}</>}
               </div>
             </div>
           </div>
