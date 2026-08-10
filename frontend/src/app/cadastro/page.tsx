@@ -8,6 +8,7 @@ import { MailCheck } from "lucide-react";
 import { authService } from "@/services/auth.service";
 
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import PasswordInput from "@/components/auth/PasswordInput";
 
 import { useToast } from "@/providers/ToastProvider";
 
@@ -107,6 +108,7 @@ export default function CadastroPage() {
           type="text"
           name="nome"
           placeholder="Nome"
+          autoComplete="name"
           required
           className="control mb-4"
         />
@@ -115,28 +117,29 @@ export default function CadastroPage() {
           type="email"
           name="email"
           placeholder="E-mail"
+          autoComplete="email"
           required
           className="control mb-4"
         />
 
-        <input
-          type="password"
+        <PasswordInput
           name="senha"
           minLength={10}
           maxLength={128}
           placeholder="Senha"
+          autoComplete="new-password"
           required
-          className="control mb-4"
+          className="mb-4"
         />
 
-        <input
-          type="password"
+        <PasswordInput
           name="confirmarSenha"
           minLength={10}
           maxLength={128}
           placeholder="Confirmar senha"
+          autoComplete="new-password"
           required
-          className="control mb-6"
+          className="mb-6"
         />
 
         <button

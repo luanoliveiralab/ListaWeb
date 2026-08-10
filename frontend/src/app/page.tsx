@@ -8,6 +8,7 @@ import Image from "next/image";
 import { authService } from "@/services/auth.service";
 
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import PasswordInput from "@/components/auth/PasswordInput";
 
 import { useToast } from "@/providers/ToastProvider";
 
@@ -103,16 +104,17 @@ export default function LoginPage() {
           type="email"
           name="email"
           placeholder="E-mail"
+          autoComplete="email"
           required
           className="control mb-4"
         />
 
-        <input
-          type="password"
+        <PasswordInput
           name="senha"
           placeholder="Senha"
+          autoComplete="current-password"
           required
-          className="control mb-3"
+          className="mb-3"
         />
 
         <div className="mb-5 text-right">

@@ -11,6 +11,24 @@ test("exibe os acessos públicos da tela de login", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/sobre");
 });
 
+test("permite mostrar e ocultar senhas no login e no cadastro", async ({ page }) => {
+  await page.goto("/");
+  const senhaLogin = page.getByPlaceholder("Senha");
+  await senhaLogin.fill("senha-visivel");
+  await expect(senhaLogin).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Mostrar senha" }).click();
+  await expect(senhaLogin).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Ocultar senha" }).click();
+  await expect(senhaLogin).toHaveAttribute("type", "password");
+
+  await page.goto("/cadastro");
+  const senhaCadastro = page.getByPlaceholder("Senha", { exact: true });
+  const confirmarSenha = page.getByPlaceholder("Confirmar senha");
+  await page.getByRole("button", { name: "Mostrar senha" }).first().click();
+  await expect(senhaCadastro).toHaveAttribute("type", "text");
+  await expect(confirmarSenha).toHaveAttribute("type", "password");
+});
+
 test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page }) => {
   await page.goto("/sobre");
   await expect(page.getByRole("heading", { name: /Mais clareza/ })).toBeVisible();
