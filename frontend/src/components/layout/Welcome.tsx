@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
 import Image from "next/image";
 
@@ -6,7 +9,14 @@ interface WelcomeProps {
   foto?: string | null;
 }
 
+const mensagens = [
+  "Bem-vindo ao seu painel. Organize suas compras, acompanhe seu progresso e mantenha tudo sob controle em um só lugar.",
+  "Acompanhe saldo, receitas, despesas, cartões e faturas para entender o mês com mais clareza.",
+  "Use metas, orçamentos e recorrências para transformar seus registros em próximos passos possíveis.",
+];
+
 export default function Welcome({ nome, foto }: WelcomeProps) {
+  const [indice, setIndice] = useState(0);
   const hora = new Date().getHours();
 
   let saudacao = "Boa noite";
@@ -16,6 +26,16 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
   } else if (hora < 18) {
     saudacao = "Boa tarde";
   }
+
+  useEffect(() => {
+    const movimentoReduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (movimentoReduzido) return;
+    const intervalo = window.setInterval(
+      () => setIndice((atual) => (atual + 1) % mensagens.length),
+      7000
+    );
+    return () => window.clearInterval(intervalo);
+  }, []);
 
   return (
     <section className="surface relative mb-6 overflow-hidden bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-8">
@@ -30,11 +50,37 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
             {nome}
           </h1>
 
-          <p className="mt-3 max-w-2xl text-muted-foreground">
-            Bem-vindo ao seu painel. Organize suas compras,
-            acompanhe seu progresso e mantenha tudo sob
-            controle em um só lugar.
-          </p>
+          <div className="mt-3 max-w-2xl overflow-hidden" aria-live="polite">
+            <div
+              className="flex transition-transform duration-700 ease-out motion-reduce:transition-none"
+              style={{ transform: `translateX(-${indice * 100}%)` }}
+            >
+              {mensagens.map((mensagem, posicao) => (
+                <p
+                  key={mensagem}
+                  aria-hidden={posicao !== indice}
+                  className="min-h-12 min-w-full text-muted-foreground"
+                >
+                  {mensagem}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-2" aria-label="Selecionar mensagem do painel">
+            {mensagens.map((mensagem, posicao) => (
+              <button
+                key={mensagem}
+                type="button"
+                aria-label={`Mostrar mensagem ${posicao + 1}`}
+                aria-current={posicao === indice ? "true" : undefined}
+                onClick={() => setIndice(posicao)}
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  posicao === indice ? "w-8 bg-primary" : "w-3 bg-primary/25 hover:bg-primary/45"
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="hidden shrink-0 lg:block">

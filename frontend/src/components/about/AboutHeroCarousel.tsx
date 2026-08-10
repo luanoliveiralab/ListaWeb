@@ -26,7 +26,7 @@ export default function AboutHeroCarousel() {
     if (movimentoReduzido) return;
     const intervalo = window.setInterval(
       () => setIndice((atual) => (atual + 1) % mensagens.length),
-      5000
+      7000
     );
     return () => window.clearInterval(intervalo);
   }, []);
