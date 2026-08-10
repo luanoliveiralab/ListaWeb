@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MouseEvent, useTransition } from "react";
 import Image from "next/image";
+import { useUsuario } from "@/hooks/useUsuario";
+import { useNotifications } from "@/hooks/useNotifications";
 
 import {
   LayoutDashboard,
@@ -12,6 +14,7 @@ import {
   Target,
   User,
   Wallet,
+  Bell,
 } from "lucide-react";
 
 const links = [
@@ -26,6 +29,12 @@ const links = [
     label: "Lista de Compras",
     mobileLabel: "Compras",
     icon: ShoppingCart,
+  },
+  {
+    href: "/avisos",
+    mobileLabel: "Avisos",
+    label: "Avisos",
+    icon: Bell,
   },
   {
     href: "/financas",
@@ -57,6 +66,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [navegando, iniciarNavegacao] = useTransition();
+  const { usuario } = useUsuario();
+  const { naoLidos } = useNotifications(usuario?.id);
 
   function navegar(
     event: MouseEvent<HTMLAnchorElement>,
@@ -99,7 +110,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="grid w-full grid-cols-6 gap-1 p-2 md:block md:flex-1 md:space-y-2 md:p-4">
+      <nav className="grid w-full grid-cols-7 gap-1 p-2 md:block md:flex-1 md:space-y-2 md:p-4">
         {links.map((link) => {
           const Icon = link.icon;
           const ativo = pathname === link.href;
@@ -115,7 +126,7 @@ export default function Sidebar() {
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
             >
-              <Icon size={20} />
+              <span className="relative shrink-0"><Icon size={20} />{link.href === "/avisos" && naoLidos > 0 && <span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{Math.min(9, naoLidos)}</span>}</span>
               <span className="max-w-full truncate md:hidden">{link.mobileLabel}</span>
               <span className="hidden max-w-full truncate md:inline">{link.label}</span>
             </Link>

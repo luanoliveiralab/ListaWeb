@@ -65,6 +65,22 @@ test("mantém a caixa de notificações dentro da tela", async ({ page }) => {
   expect(posicao.direita).toBeLessThanOrEqual(posicao.larguraTela);
 });
 
+test("centraliza, filtra e marca avisos como lidos", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/avisos");
+
+  await expect(page.getByRole("heading", { name: "Central de avisos" })).toBeVisible();
+  await expect(page.getByText("Orçamento em atenção")).toBeVisible();
+  await page.getByRole("button", { name: "Marcar todos como lidos" }).click();
+  await expect(page.getByText("Tudo lido por aqui")).toBeVisible();
+  await page.getByRole("button", { name: "Não lidos" }).click();
+  await expect(page.getByText("Nenhum aviso neste filtro")).toBeVisible();
+});
+
 test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) => {
   await prepararApi(page);
   const hoje = new Date();
