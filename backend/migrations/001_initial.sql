@@ -129,6 +129,9 @@ CREATE TABLE IF NOT EXISTS faturas_cartao (
 
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS fatura_pagamento_id
     INTEGER REFERENCES faturas_cartao(id) ON DELETE SET NULL;
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS grupo_parcelamento UUID;
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS parcela_atual SMALLINT CHECK (parcela_atual IS NULL OR parcela_atual > 0);
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS parcelas_total SMALLINT CHECK (parcelas_total IS NULL OR parcelas_total BETWEEN 2 AND 48);
 
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS forma_pagamento
     VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
@@ -150,6 +153,8 @@ CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at
 CREATE INDEX IF NOT EXISTS idx_faturas_cartao_periodo ON faturas_cartao(cartao_id, ano DESC, mes DESC);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_fatura_pagamento ON movimentacoes(fatura_pagamento_id)
     WHERE fatura_pagamento_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_grupo_parcelamento ON movimentacoes(grupo_parcelamento)
+    WHERE grupo_parcelamento IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao_id, data DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

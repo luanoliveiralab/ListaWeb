@@ -1466,6 +1466,7 @@ app.post(
             data,
             forma_pagamento,
             cartao_id,
+            parcelas,
         } = req.body;
 
         if (
@@ -1490,19 +1491,45 @@ app.post(
 
         const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
         const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+        const totalParcelas = formaPagamento === "credito" ? Number(parcelas ?? 1) : 1;
         if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) {
             return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
         }
+        if (!Number.isInteger(totalParcelas) || totalParcelas < 1 || totalParcelas > 48) {
+            return res.status(400).json({ mensagem: "A compra pode ter entre 1 e 48 parcelas." });
+        }
 
+        const client = await pool.connect();
         try {
+            await client.query("BEGIN");
             let cartaoNome = null;
             if (cartaoId) {
-                const cartao = await pool.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
-                if (!cartao.rowCount) return res.status(400).json({ mensagem: "Cartão inválido." });
+                const cartao = await client.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                if (!cartao.rowCount) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
                 cartaoNome = cartao.rows[0].nome;
             }
-            const result =
-                await pool.query(
+            const dataBase = data ? new Date(`${data}T12:00:00Z`) : new Date();
+            if (Number.isNaN(dataBase.getTime())) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Data inválida." }); }
+            const grupoParcelamento = totalParcelas > 1 ? crypto.randomUUID() : null;
+            const totalCentavos = Math.round(valor * 100);
+            const baseCentavos = Math.floor(totalCentavos / totalParcelas);
+            const restante = totalCentavos - baseCentavos * totalParcelas;
+            const criadas = [];
+
+            for (let indice = 0; indice < totalParcelas; indice += 1) {
+                const primeiroDia = new Date(Date.UTC(dataBase.getUTCFullYear(), dataBase.getUTCMonth() + indice, 1));
+                const ultimoDia = new Date(Date.UTC(primeiroDia.getUTCFullYear(), primeiroDia.getUTCMonth() + 1, 0)).getUTCDate();
+                const dia = Math.min(dataBase.getUTCDate(), ultimoDia);
+                const dataParcela = `${primeiroDia.getUTCFullYear()}-${String(primeiroDia.getUTCMonth() + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+                if (cartaoId) {
+                    const bloqueada = await client.query(
+                        "SELECT 1 FROM faturas_cartao WHERE cartao_id = $1 AND ano = $2 AND mes = $3 AND status <> 'aberta'",
+                        [cartaoId, primeiroDia.getUTCFullYear(), primeiroDia.getUTCMonth() + 1]
+                    );
+                    if (bloqueada.rowCount) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Uma das parcelas pertence a uma fatura já fechada." }); }
+                }
+                const valorParcela = (baseCentavos + (indice < restante ? 1 : 0)) / 100;
+                const result = await client.query(
                     `INSERT INTO movimentacoes
                         (
                             usuario_id,
@@ -1512,7 +1539,10 @@ app.post(
                             categoria,
                             data,
                             forma_pagamento,
-                            cartao_id
+                            cartao_id,
+                            grupo_parcelamento,
+                            parcela_atual,
+                            parcelas_total
                         )
                      VALUES
                         (
@@ -1526,29 +1556,33 @@ app.post(
                                 CURRENT_DATE
                             ),
                             $7,
-                            $8
+                            $8,
+                            $9,
+                            $10,
+                            $11
                         )
                      RETURNING *`,
                     [
                         req.usuarioId,
                         tipo,
-                        descricao.trim(),
-                        valor,
+                        totalParcelas > 1 ? `${descricao.trim()} (${indice + 1}/${totalParcelas})` : descricao.trim(),
+                        valorParcela,
                         categoria.trim(),
-                        data || null,
+                        dataParcela,
                         formaPagamento,
                         cartaoId,
+                        grupoParcelamento,
+                        totalParcelas > 1 ? indice + 1 : null,
+                        totalParcelas > 1 ? totalParcelas : null,
                     ]
                 );
-
-            result.rows[0].cartao_nome = cartaoNome;
-
-            return res
-                .status(201)
-                .json(
-                    result.rows[0]
-                );
+                result.rows[0].cartao_nome = cartaoNome;
+                criadas.push(result.rows[0]);
+            }
+            await client.query("COMMIT");
+            return res.status(201).json(totalParcelas > 1 ? { movimentacoes: criadas } : criadas[0]);
         } catch (err) {
+            await client.query("ROLLBACK").catch(() => undefined);
             console.error(
                 "Erro ao adicionar movimentação:",
                 err
@@ -1558,6 +1592,8 @@ app.post(
                 mensagem:
                     "Erro ao adicionar movimentação.",
             });
+        } finally {
+            client.release();
         }
     }
 );

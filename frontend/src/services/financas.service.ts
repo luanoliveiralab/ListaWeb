@@ -9,6 +9,7 @@ export interface MovimentacaoDTO {
     data?: string;
     forma_pagamento?: "saldo" | "credito";
     cartao_id?: number | null;
+    parcelas?: number;
 }
 
 export interface AtualizarMovimentacaoDTO {
@@ -26,7 +27,7 @@ export const financasService = {
         return api.get(`/financas/${usuarioId}`);
     },
 
-    adicionar(dados: MovimentacaoDTO) {
+    adicionar(dados: MovimentacaoDTO): Promise<import("@/types/Movimentacao").Movimentacao | { movimentacoes: import("@/types/Movimentacao").Movimentacao[] }> {
         return api.post("/financas", dados);
     },
 

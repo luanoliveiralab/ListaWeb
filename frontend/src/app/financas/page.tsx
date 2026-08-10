@@ -50,6 +50,7 @@ export default function FinancasPage() {
     const [categoria, setCategoria] = useState("");
     const [formaPagamento, setFormaPagamento] = useState<"saldo" | "credito">("saldo");
     const [cartaoId, setCartaoId] = useState("");
+    const [parcelas, setParcelas] = useState("1");
     const [data, setData] = useState(
         new Date().toISOString().split("T")[0]
     );
@@ -173,6 +174,7 @@ export default function FinancasPage() {
         setCategoria("");
         setFormaPagamento("saldo");
         setCartaoId("");
+        setParcelas("1");
         setData(new Date().toISOString().split("T")[0]);
 
         try {
@@ -185,9 +187,11 @@ export default function FinancasPage() {
                 data,
                 forma_pagamento: formaFinal,
                 cartao_id: cartaoFinal,
+                parcelas: Number(parcelas),
             });
 
-            atualizarMovimentacoes((prev) => prev.map((mov) => mov.id === temporaria.id ? nova : mov));
+            const novas = "movimentacoes" in nova ? nova.movimentacoes : [nova];
+            atualizarMovimentacoes((prev) => [...novas, ...prev.filter((mov) => mov.id !== temporaria.id)]);
             atualizarDashboard();
 
             mostrarAviso("Movimentação adicionada com sucesso!");
@@ -372,6 +376,8 @@ export default function FinancasPage() {
                 setFormaPagamento={setFormaPagamento}
                 cartaoId={cartaoId}
                 setCartaoId={setCartaoId}
+                parcelas={parcelas}
+                setParcelas={setParcelas}
                 cartoes={cartoes}
                 adicionarMovimentacao={adicionarMovimentacao}
             />

@@ -19,4 +19,7 @@ export interface Movimentacao {
     cartao_id?: number | null;
     cartao_nome?: string | null;
     fatura_pagamento_id?: number | null;
+    grupo_parcelamento?: string | null;
+    parcela_atual?: number | null;
+    parcelas_total?: number | null;
 }
