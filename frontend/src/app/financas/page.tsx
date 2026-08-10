@@ -71,11 +71,23 @@ export default function FinancasPage() {
         if (!usuario?.id) return;
 
         async function load() {
+            const cacheKey = `financas:${usuario!.id}:${ano}-${mes}`;
+            const cache = sessionStorage.getItem(cacheKey);
+            if (cache) {
+                try {
+                    setMovimentacoes(JSON.parse(cache));
+                    setLoading(false);
+                } catch {
+                    sessionStorage.removeItem(cacheKey);
+                }
+            }
+
             try {
-                setLoading(true);
+                if (!cache) setLoading(true);
 
                 const resposta = await planejamentoService.gerarRecorrencias(mes, ano);
                 setMovimentacoes(resposta.movimentacoes);
+                sessionStorage.setItem(cacheKey, JSON.stringify(resposta.movimentacoes));
             } catch (err) {
                 console.error(err);
             } finally {
@@ -87,16 +99,46 @@ export default function FinancasPage() {
     }, [ano, mes, usuario]);
 
     useEffect(() => {
+        if (usuario?.id && !loading) {
+            sessionStorage.setItem(`financas:${usuario.id}:${ano}-${mes}`, JSON.stringify(movimentacoes));
+        }
+    }, [ano, loading, mes, movimentacoes, usuario?.id]);
+
+    useEffect(() => {
         if (!usuario?.id) return;
 
-        cartoesService.listar()
-            .then(setCartoes)
-            .catch((err) => {
+        async function carregarCartoes() {
+            const cacheKey = `cartoes:${usuario!.id}`;
+            const cache = sessionStorage.getItem(cacheKey);
+            if (cache) {
+                try {
+                    setCartoes(JSON.parse(cache));
+                    setCarregandoCartoes(false);
+                } catch {
+                    sessionStorage.removeItem(cacheKey);
+                }
+            }
+
+            try {
+                const dados = await cartoesService.listar();
+                setCartoes(dados);
+                sessionStorage.setItem(cacheKey, JSON.stringify(dados));
+            } catch (err) {
                 console.error(err);
                 mostrarAviso("Não foi possível carregar os cartões.", "erro");
-            })
-            .finally(() => setCarregandoCartoes(false));
-    }, [mostrarAviso, usuario?.id]);
+            } finally {
+                setCarregandoCartoes(false);
+            }
+        }
+
+        carregarCartoes();
+    }, [mostrarAviso, usuario]);
+
+    useEffect(() => {
+        if (usuario?.id && !carregandoCartoes) {
+            sessionStorage.setItem(`cartoes:${usuario.id}`, JSON.stringify(cartoes));
+        }
+    }, [carregandoCartoes, cartoes, usuario?.id]);
 
     async function adicionarCartao(dados: {
         nome: string;

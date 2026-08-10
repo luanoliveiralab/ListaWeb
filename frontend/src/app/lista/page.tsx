@@ -43,8 +43,19 @@ export default function ListaPage() {
     if (!usuario?.id) return;
 
     async function load() {
+      const cacheKey = `lista:${usuario!.id}`;
+      const cache = sessionStorage.getItem(cacheKey);
+      if (cache) {
+        try {
+          setLista(JSON.parse(cache));
+          setLoading(false);
+        } catch {
+          sessionStorage.removeItem(cacheKey);
+        }
+      }
+
       try {
-        setLoading(true);
+        if (!cache) setLoading(true);
 
         const usuarioId = usuario?.id;
 
@@ -53,6 +64,7 @@ export default function ListaPage() {
         const data = await listaService.buscarPorUsuario(usuarioId);
 
         setLista(data);
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
       } catch (err) {
         console.error("Erro ao carregar lista:", err);
 
@@ -67,6 +79,12 @@ export default function ListaPage() {
 
     load();
   }, [usuario, mostrarAviso]);
+
+  useEffect(() => {
+    if (usuario?.id && !loading) {
+      sessionStorage.setItem(`lista:${usuario.id}`, JSON.stringify(lista));
+    }
+  }, [lista, loading, usuario?.id]);
 
   // =========================
   // ADICIONAR ITEM
