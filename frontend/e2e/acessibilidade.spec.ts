@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { prepararApi, usuario } from "./fixtures";
 
 async function esperarAnimacoes(page: Page) {
-  await page.waitForTimeout(350);
+  await page.waitForTimeout(900);
 }
 
 async function esperarSemViolacoesCriticas(page: Page) {

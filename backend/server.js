@@ -858,8 +858,6 @@ app.post(
             quantidade,
             categoria,
             valor,
-            forma_pagamento,
-            cartao_id,
         } = req.body;
 
         if (
@@ -972,6 +970,8 @@ app.put(
             quantidade,
             categoria,
             valor,
+            forma_pagamento,
+            cartao_id,
         } = req.body;
 
         if (
