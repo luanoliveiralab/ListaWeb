@@ -16,6 +16,7 @@ import { orcamentosService } from "@/services/orcamentos.service";
 import { usePeriod } from "@/context/PeriodContext";
 import { useCategorias } from "@/hooks/useCategorias";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { useBudgetThresholdAlerts } from "@/hooks/useBudgetThresholdAlerts";
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numeroMoeda = (valor: string) => Number(valor.includes(",") ? valor.replace(/\./g, "").replace(",", ".") : valor);
@@ -48,6 +49,15 @@ export default function PlanejamentoPage() {
   const orcamentos = orcamentosQuery.data ?? [];
   const movimentacoes = movimentacoesQuery.data ?? [];
   const erroCarregamento = recorrenciasQuery.error || metasQuery.error || orcamentosQuery.error || movimentacoesQuery.error;
+
+  useBudgetThresholdAlerts({
+    usuarioId: usuario?.id,
+    mes,
+    ano,
+    orcamentos,
+    movimentacoes,
+    carregado: orcamentosQuery.isFetched && movimentacoesQuery.isFetched,
+  });
 
   useEffect(() => {
     if (erroCarregamento) mostrarAviso("Não foi possível carregar o planejamento.", "erro");

@@ -47,6 +47,24 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Finanças/ })).toBeVisible();
 });
 
+test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) => {
+  await prepararApi(page);
+  const hoje = new Date();
+  const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-10`;
+  await page.route("http://localhost:3001/orcamentos/42**", (route) => responderJson(route, [{ id: 91, categoria: "Mercado", valor: 800, mes: hoje.getMonth() + 1, ano: hoje.getFullYear() }]));
+  await page.route("http://localhost:3001/recorrencias/gerar", (route) => responderJson(route, { geradas: 0, movimentacoes: [{ id: 92, usuario_id: 42, tipo: "despesa", descricao: "Compras", valor: 450, categoria: "Mercado", data, created_at: hoje.toISOString(), forma_pagamento: "saldo" }] }));
+
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/planejamento");
+
+  await expect(page.getByRole("alert").filter({ hasText: "Você já utilizou 50% do orçamento de Mercado." })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Você já utilizou 50% do orçamento de Mercado.")).not.toBeVisible();
+});
+
 test("mantém header e formulário fixos enquanto apenas categorias rolam", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/");

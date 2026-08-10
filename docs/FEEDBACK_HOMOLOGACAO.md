@@ -53,3 +53,4 @@ Não inclua senhas, dados bancários ou informações financeiras reais.
 - Sugestão: avisar quando o consumo de uma categoria alcançar percentuais relevantes do orçamento, por exemplo: “Você já utilizou 80% do orçamento de Mercado”.
 - Classificação: melhoria de produto; prioridade sugerida: média.
 - Critério inicial recomendado: avisos únicos em 50%, 80% e 100%, exibidos dentro do aplicativo, sem notificações externas nesta primeira versão.
+- Situação: implementado em 10/08/2026 nas páginas Finanças e Planejamento, com persistência dos marcos no dispositivo e presença contínua no centro de notificações.

@@ -9,9 +9,9 @@ import {
     useState,
 } from "react";
 
-import { CheckCircle2, CircleAlert, X } from "lucide-react";
+import { CheckCircle2, CircleAlert, TriangleAlert, X } from "lucide-react";
 
-type TipoAviso = "sucesso" | "erro";
+type TipoAviso = "sucesso" | "erro" | "alerta";
 
 interface Aviso {
     mensagem: string;
@@ -50,6 +50,7 @@ export function ToastProvider({
     );
 
     const sucesso = aviso?.tipo === "sucesso";
+    const alerta = aviso?.tipo === "alerta";
 
     return (
         <ToastContext.Provider value={{ mostrarAviso }}>
@@ -58,13 +59,18 @@ export function ToastProvider({
             {aviso && (
                 <div className="fixed inset-x-4 top-4 z-[100] animate-in fade-in slide-in-from-top-4 sm:left-auto sm:right-6 sm:top-6 sm:w-full sm:max-w-sm">
                     <div
+                        role={alerta || !sucesso ? "alert" : "status"}
                         className={`flex items-start gap-3 rounded-2xl border p-4 shadow-xl ${sucesso
                                 ? "border-emerald-500/30 bg-emerald-500 text-white"
-                                : "border-red-500/30 bg-red-500 text-white"
+                                : alerta
+                                    ? "border-amber-500/30 bg-amber-500 text-slate-950"
+                                    : "border-red-500/30 bg-red-500 text-white"
                             }`}
                     >
                         {sucesso ? (
                             <CheckCircle2 className="mt-0.5 shrink-0" size={22} />
+                        ) : alerta ? (
+                            <TriangleAlert className="mt-0.5 shrink-0" size={22} />
                         ) : (
                             <CircleAlert className="mt-0.5 shrink-0" size={22} />
                         )}

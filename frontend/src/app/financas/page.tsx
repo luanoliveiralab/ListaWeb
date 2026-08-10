@@ -28,6 +28,9 @@ import CreditCardsPanel from "@/components/financas/CreditCardsPanel";
 import { cartoesService } from "@/services/cartoes.service";
 import type { Cartao } from "@/types/Cartao";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import type { Orcamento } from "@/types/Orcamento";
+import { orcamentosService } from "@/services/orcamentos.service";
+import { useBudgetThresholdAlerts } from "@/hooks/useBudgetThresholdAlerts";
 
 export default function FinancasPage() {
     const { usuario } = useUsuario();
@@ -65,6 +68,7 @@ export default function FinancasPage() {
 
     const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
     const cartoesKey = ["cartoes", usuario?.id] as const;
+    const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
     const movimentacoesQuery = useQuery<Movimentacao[]>({
         queryKey: movimentacoesKey,
         queryFn: async () => (await planejamentoService.gerarRecorrencias(mes, ano)).movimentacoes,
@@ -75,10 +79,25 @@ export default function FinancasPage() {
         queryFn: cartoesService.listar,
         enabled: Boolean(usuario?.id),
     });
+    const orcamentosQuery = useQuery<Orcamento[]>({
+        queryKey: orcamentosKey,
+        queryFn: () => orcamentosService.buscar(usuario!.id, mes, ano),
+        enabled: Boolean(usuario?.id),
+    });
     const movimentacoes = movimentacoesQuery.data ?? [];
     const cartoes = cartoesQuery.data ?? [];
+    const orcamentos = orcamentosQuery.data ?? [];
     const loading = movimentacoesQuery.isPending;
     const carregandoCartoes = cartoesQuery.isPending;
+
+    useBudgetThresholdAlerts({
+        usuarioId: usuario?.id,
+        mes,
+        ano,
+        orcamentos,
+        movimentacoes,
+        carregado: orcamentosQuery.isFetched && movimentacoesQuery.isFetched,
+    });
 
     useEffect(() => {
         if (cartoesQuery.error) mostrarAviso("Não foi possível carregar os cartões.", "erro");
