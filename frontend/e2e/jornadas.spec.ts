@@ -47,6 +47,24 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Finanças/ })).toBeVisible();
 });
 
+test("mantém a caixa de notificações dentro da tela", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("button", { name: "Notificações" }).click();
+
+  const painel = page.locator("[data-slot='notification-panel']");
+  await expect(painel).toBeVisible();
+  const posicao = await painel.evaluate((elemento) => {
+    const caixa = elemento.getBoundingClientRect();
+    return { esquerda: caixa.left, direita: caixa.right, larguraTela: window.innerWidth };
+  });
+  expect(posicao.esquerda).toBeGreaterThanOrEqual(0);
+  expect(posicao.direita).toBeLessThanOrEqual(posicao.larguraTela);
+});
+
 test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) => {
   await prepararApi(page);
   const hoje = new Date();
