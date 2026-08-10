@@ -148,7 +148,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           Nenhum cartão cadastrado. Use “Criar novo cartão” para começar.
         </div>
       ) : (
-        <div className="flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto overscroll-x-contain p-5 pr-[18vw] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:p-6 sm:pr-6 xl:grid-cols-4">
+        <div className="flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto overscroll-x-contain p-5 pr-[18vw] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:w-full sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:p-6 sm:pr-6 xl:grid-cols-[repeat(4,minmax(0,1fr))] xl:px-7">
           {cartoes.map((cartao) => {
             const estilo = estilos[cartao.instituicao] ?? { ...padrao, sigla: cartao.instituicao };
             const fatura = movimentacoes
@@ -158,7 +158,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
             const disponivel = Math.max(limite - fatura, 0);
             const uso = limite > 0 ? Math.min((fatura / limite) * 100, 100) : 0;
             return (
-              <article key={cartao.id} className={`relative aspect-[1.586/1] min-h-48 w-[82vw] max-w-[320px] shrink-0 snap-start overflow-hidden rounded-[1.4rem] bg-gradient-to-br ${estilo.fundo} p-5 text-white shadow-lg transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:w-auto sm:max-w-none`}>
+              <article key={cartao.id} className={`relative aspect-[1.586/1] min-h-48 w-[82vw] max-w-[320px] shrink-0 snap-start overflow-hidden rounded-[1.4rem] bg-gradient-to-br ${estilo.fundo} p-5 text-white shadow-lg transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:min-h-0 sm:min-w-0 sm:w-auto sm:max-w-none`}>
                 <div className="absolute -right-12 -top-16 size-44 rounded-full bg-white/10" />
                 <div className="absolute -bottom-24 -left-12 size-52 rounded-full bg-black/10" />
                 <div className="relative flex h-full flex-col justify-between">
