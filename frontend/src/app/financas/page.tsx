@@ -245,11 +245,11 @@ export default function FinancasPage() {
     // RESUMO FINANCEIRO
     // =========================
     const movimentacoesFiltradas = movimentacoes.filter((mov) => {
-        const data = new Date(mov.data);
+        const [anoMov, mesMov] = mov.data.slice(0, 10).split("-").map(Number);
 
         return (
-            data.getMonth() + 1 === mes &&
-            data.getFullYear() === ano
+            mesMov === mes &&
+            anoMov === ano
         );
     });
 

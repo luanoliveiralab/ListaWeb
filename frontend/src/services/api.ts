@@ -35,7 +35,10 @@ async function request(endpoint: string, options: RequestOptions = {}) {
         ...rest,
     });
 
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") ?? "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : { mensagem: (await response.text()).trim() };
 
     if (data.csrfToken && typeof window !== "undefined") {
         sessionStorage.setItem("csrfToken", data.csrfToken);

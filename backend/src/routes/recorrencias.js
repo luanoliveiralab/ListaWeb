@@ -5,6 +5,11 @@ const { autenticar } = require("../middleware/autenticar");
 const router = express.Router();
 router.use(autenticar);
 
+function idValido(valor) {
+    const id = Number(valor);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 router.get("/", async (req, res, next) => {
     try {
         const result = await pool.query("SELECT * FROM recorrencias WHERE usuario_id = $1 ORDER BY ativa DESC, dia, descricao", [req.usuarioId]);
@@ -28,16 +33,20 @@ router.post("/", async (req, res, next) => {
 });
 
 router.put("/:id", async (req, res, next) => {
+    const id = idValido(req.params.id);
+    if (!id) return res.status(400).json({ mensagem: "ID da recorrência inválido." });
     try {
-        const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [Boolean(req.body.ativa), Number(req.params.id), req.usuarioId]);
+        const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [Boolean(req.body.ativa), id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
         return res.json(result.rows[0]);
     } catch (error) { return next(error); }
 });
 
 router.delete("/:id", async (req, res, next) => {
+    const id = idValido(req.params.id);
+    if (!id) return res.status(400).json({ mensagem: "ID da recorrência inválido." });
     try {
-        const result = await pool.query("DELETE FROM recorrencias WHERE id = $1 AND usuario_id = $2 RETURNING id", [Number(req.params.id), req.usuarioId]);
+        const result = await pool.query("DELETE FROM recorrencias WHERE id = $1 AND usuario_id = $2 RETURNING id", [id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
         return res.json({ mensagem: "Recorrência removida." });
     } catch (error) { return next(error); }

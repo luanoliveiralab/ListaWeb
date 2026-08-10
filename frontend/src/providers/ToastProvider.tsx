@@ -4,6 +4,8 @@ import {
     createContext,
     useCallback,
     useContext,
+    useEffect,
+    useRef,
     useState,
 } from "react";
 
@@ -28,13 +30,20 @@ export function ToastProvider({
     children: React.ReactNode;
 }) {
     const [aviso, setAviso] = useState<Aviso | null>(null);
+    const timeoutRef = useRef<number | null>(null);
+
+    useEffect(() => () => {
+        if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    }, []);
 
     const mostrarAviso = useCallback(
         (mensagem: string, tipo: TipoAviso = "sucesso") => {
             setAviso({ mensagem, tipo });
 
-            window.setTimeout(() => {
+            if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+            timeoutRef.current = window.setTimeout(() => {
                 setAviso(null);
+                timeoutRef.current = null;
             }, 4000);
         },
         []
@@ -47,7 +56,7 @@ export function ToastProvider({
             {children}
 
             {aviso && (
-                <div className="fixed right-6 top-6 z-[100] w-full max-w-sm animate-in fade-in slide-in-from-top-4">
+                <div className="fixed inset-x-4 top-4 z-[100] animate-in fade-in slide-in-from-top-4 sm:left-auto sm:right-6 sm:top-6 sm:w-full sm:max-w-sm">
                     <div
                         className={`flex items-start gap-3 rounded-2xl border p-4 shadow-xl ${sucesso
                                 ? "border-emerald-500/30 bg-emerald-500 text-white"
@@ -65,7 +74,11 @@ export function ToastProvider({
                         </p>
 
                         <button
-                            onClick={() => setAviso(null)}
+                            onClick={() => {
+                                if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+                                timeoutRef.current = null;
+                                setAviso(null);
+                            }}
                             className="rounded-lg p-1 transition hover:bg-white/20"
                             aria-label="Fechar aviso"
                         >

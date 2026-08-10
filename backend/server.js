@@ -266,10 +266,6 @@ app.post("/login", limitarTentativas(), async (req, res) => {
 
         const user = result.rows[0];
 
-        if (!user.email_verificado) {
-            return res.status(403).json({ mensagem: "Confirme seu e-mail antes de entrar." });
-        }
-
         const senhaValida = typeof user.senha === "string" && user.senha.startsWith("$2")
             ? await bcrypt.compare(
                 senha,
@@ -281,6 +277,10 @@ app.post("/login", limitarTentativas(), async (req, res) => {
             return res.status(401).json({
                 mensagem: "E-mail ou senha incorretos.",
             });
+        }
+
+        if (!user.email_verificado) {
+            return res.status(403).json({ mensagem: "Confirme seu e-mail antes de entrar." });
         }
 
         const token = jwt.sign(
@@ -449,6 +449,12 @@ app.put(
             });
         }
 
+        const nomeLimpo = nome.trim();
+        const emailLimpo = email.trim().toLowerCase();
+        if (nomeLimpo.length > 120 || emailLimpo.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailLimpo)) {
+            return res.status(400).json({ mensagem: "Informe um nome e um e-mail válidos." });
+        }
+
         try {
             const emailExistente =
                 await pool.query(
@@ -456,12 +462,7 @@ app.put(
                      FROM usuarios
                      WHERE LOWER(email) = LOWER($1)
                      AND id <> $2`,
-                    [
-                        email
-                            .trim()
-                            .toLowerCase(),
-                        usuarioId,
-                    ]
+                    [emailLimpo, usuarioId]
                 );
 
             if (
@@ -480,13 +481,7 @@ app.put(
                          email = $2
                      WHERE id = $3
                      RETURNING id, nome, email, foto`,
-                    [
-                        nome.trim(),
-                        email
-                            .trim()
-                            .toLowerCase(),
-                        usuarioId,
-                    ]
+                    [nomeLimpo, emailLimpo, usuarioId]
                 );
 
             if (
@@ -502,6 +497,9 @@ app.put(
                 result.rows[0]
             );
         } catch (err) {
+            if (err?.code === "23505") {
+                return res.status(400).json({ mensagem: "Este e-mail já está sendo usado." });
+            }
             console.error(
                 "Erro ao atualizar usuário:",
                 err
@@ -2239,25 +2237,33 @@ app.post("/cartoes", autenticar, async (req, res) => {
         return res.status(400).json({ mensagem: "Dados do cartão inválidos." });
     }
 
+    const client = await pool.connect();
     try {
-        const quantidade = await pool.query(
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock($1)", [req.usuarioId]);
+        const quantidade = await client.query(
             "SELECT COUNT(*)::int AS total FROM cartoes WHERE usuario_id = $1",
             [req.usuarioId]
         );
         if (quantidade.rows[0].total >= 4) {
+            await client.query("ROLLBACK");
             return res.status(400).json({ mensagem: "Você pode cadastrar no máximo 4 cartões." });
         }
 
-        const result = await pool.query(
+        const result = await client.query(
             `INSERT INTO cartoes (usuario_id, nome, instituicao, limite_disponivel, dia_vencimento)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING *`,
             [req.usuarioId, nome.trim(), instituicao.trim(), limite, vencimento]
         );
+        await client.query("COMMIT");
         return res.status(201).json(result.rows[0]);
     } catch (err) {
+        await client.query("ROLLBACK").catch(() => undefined);
         console.error("Erro ao adicionar cartão:", err);
         return res.status(500).json({ mensagem: "Erro ao adicionar cartão." });
+    } finally {
+        client.release();
     }
 });
 

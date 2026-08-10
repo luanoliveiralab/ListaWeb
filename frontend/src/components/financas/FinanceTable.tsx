@@ -313,7 +313,7 @@ export default function FinanceTable({
                                                     </span>
                                                 )}
                                                 <time dateTime={movimentacao.data}>
-                                                    {new Date(movimentacao.data).toLocaleDateString("pt-BR")}
+                                                    {new Date(`${movimentacao.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
                                                 </time>
                                             </div>
                                         </div>

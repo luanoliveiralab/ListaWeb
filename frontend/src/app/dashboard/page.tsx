@@ -102,11 +102,11 @@ export default function Dashboard() {
   ).length;
 
   const movimentacoesFiltradas = movimentacoes.filter((mov) => {
-    const data = new Date(mov.data);
+    const [anoMov, mesMov] = mov.data.slice(0, 10).split("-").map(Number);
 
     return (
-      data.getMonth() + 1 === mes &&
-      data.getFullYear() === ano
+      mesMov === mes &&
+      anoMov === ano
     );
   });
 
@@ -128,11 +128,7 @@ export default function Dashboard() {
     movimentacoesFiltradas.length;
 
   const ultimasMovimentacoes = [...movimentacoesFiltradas]
-    .sort(
-      (a, b) =>
-        new Date(b.data).getTime() -
-        new Date(a.data).getTime()
-    )
+    .sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id)
     .slice(0, 5);
 
   return (

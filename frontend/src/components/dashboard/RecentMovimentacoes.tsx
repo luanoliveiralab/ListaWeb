@@ -38,7 +38,7 @@ export default function RecentMovimentacoes({ movimentacoes }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{mov.descricao}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {mov.categoria} · {new Date(mov.data).toLocaleDateString("pt-BR")}
+                    {mov.categoria} · {new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
                 <strong className={`shrink-0 tabular-nums ${receita ? "text-emerald-600" : "text-rose-600"}`}>

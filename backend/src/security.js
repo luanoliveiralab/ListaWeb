@@ -12,9 +12,10 @@ function cookieOptions() {
     const sameSite = ["lax", "strict", "none"].includes(process.env.COOKIE_SAME_SITE)
         ? process.env.COOKIE_SAME_SITE
         : "lax";
+    const secure = process.env.COOKIE_SECURE === "true" || sameSite === "none";
     return {
         httpOnly: true,
-        secure: process.env.COOKIE_SECURE === "true",
+        secure,
         sameSite,
         maxAge: 8 * 60 * 60 * 1000,
         path: "/",
