@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  ArrowDownRight, ArrowUpRight, CheckCircle2, Clock3,
-  Receipt, ShoppingCart, TrendingUp, Wallet,
-} from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CreditCard, ShoppingCart, Wallet } from "lucide-react";
 
 import type { Cartao } from "@/types/Cartao";
 import type { Movimentacao } from "@/types/Movimentacao";
@@ -63,7 +60,7 @@ export default function DashboardCards({
   const faturaAtual = cartaoAtual
     ? movimentacoesDoPeriodo
         .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito" && Number(mov.cartao_id) === cartaoAtual.id)
-        .reduce((total, mov) => total + Number(mov.valor), 0)
+        .reduce((totalFatura, mov) => totalFatura + Number(mov.valor), 0)
     : 0;
   const creditoDisponivel = cartaoAtual
     ? Math.max(Number(cartaoAtual.limite_disponivel) - faturaAtual, 0)
@@ -71,29 +68,33 @@ export default function DashboardCards({
   const coresCartao = cartaoAtual
     ? coresInstituicoes[cartaoAtual.instituicao] ?? { texto: "text-violet-700 dark:text-violet-300", fundo: "bg-violet-500/15" }
     : { texto: "text-muted-foreground", fundo: "bg-muted" };
+  const despesasCredito = movimentacoesDoPeriodo
+    .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito")
+    .reduce((soma, mov) => soma + Number(mov.valor), 0);
+  const quantidadeReceitas = movimentacoesDoPeriodo.filter((mov) => mov.tipo === "receita").length;
 
   const cards = [
-    { titulo: "Total de itens", valor: String(total), Icone: ShoppingCart, cor: "text-blue-600", fundo: "bg-blue-500/10" },
-    { titulo: "Comprados", valor: String(comprados), Icone: CheckCircle2, cor: "text-emerald-600", fundo: "bg-emerald-500/10" },
-    { titulo: "Pendentes", valor: String(pendentes), Icone: Clock3, cor: "text-amber-600", fundo: "bg-amber-500/10" },
-    { titulo: "Saldo", valor: moeda(saldo), Icone: Wallet, cor: saldo >= 0 ? "text-emerald-600" : "text-rose-600", fundo: saldo >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10" },
-    { titulo: "Receitas", valor: moeda(receitas), Icone: ArrowUpRight, cor: "text-emerald-600", fundo: "bg-emerald-500/10" },
-    { titulo: "Despesas", valor: moeda(despesas), Icone: ArrowDownRight, cor: "text-rose-600", fundo: "bg-rose-500/10" },
-    { titulo: "Movimentações", valor: String(movimentacoes), Icone: Receipt, cor: "text-sky-600", fundo: "bg-sky-500/10" },
+    { titulo: "Saldo em conta", valor: moeda(saldo), detalhe: "Entradas menos despesas no saldo", Icone: Wallet, cor: saldo >= 0 ? "text-emerald-600" : "text-rose-600", fundo: saldo >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10" },
+    { titulo: "Entradas do mês", valor: moeda(receitas), detalhe: `${quantidadeReceitas} ${quantidadeReceitas === 1 ? "lançamento" : "lançamentos"} de receita`, Icone: ArrowUpRight, cor: "text-emerald-600", fundo: "bg-emerald-500/10" },
+    { titulo: "Despesas do mês", valor: moeda(despesas), detalhe: despesasCredito > 0 ? `${moeda(despesasCredito)} no crédito` : "Nenhuma despesa no crédito", Icone: ArrowDownRight, cor: "text-rose-600", fundo: "bg-rose-500/10" },
   ];
 
   return (
     <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map(({ titulo, valor, Icone, cor, fundo }, index) => (
+      {cards.map(({ titulo, valor, detalhe, Icone, cor, fundo }, index) => (
         <article key={titulo} className="surface-interactive metric-enter p-5" style={{ animationDelay: `${index * 35}ms` }}>
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0"><p className="text-sm text-muted-foreground">{titulo}</p><p className="mt-2 truncate text-2xl font-semibold tracking-tight tabular-nums">{valor}</p></div>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground">{titulo}</p>
+              <p className="mt-2 truncate text-2xl font-semibold tracking-tight tabular-nums">{valor}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{detalhe}</p>
+            </div>
             <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${fundo} ${cor}`}><Icone size={21} /></span>
           </div>
         </article>
       ))}
 
-      <article className="surface-interactive metric-enter overflow-hidden p-5" style={{ animationDelay: "245ms" }}>
+      <article className="surface-interactive metric-enter overflow-hidden p-5" style={{ animationDelay: "105ms" }}>
         <div key={cartaoAtual?.id ?? "sem-cartao"} className="animate-in fade-in slide-in-from-right-2 duration-500">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -102,7 +103,7 @@ export default function DashboardCards({
               <p className="mt-1 truncate text-xs text-muted-foreground">{cartaoAtual ? `${cartaoAtual.nome} · Fatura ${moeda(faturaAtual)}` : "Cadastre um cartão em Finanças"}</p>
             </div>
             <span className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-xs font-bold tracking-tight ${coresCartao.fundo} ${coresCartao.texto}`}>
-              {cartaoAtual ? siglaInstituicao(cartaoAtual.instituicao) : "CARD"}
+              {cartaoAtual ? siglaInstituicao(cartaoAtual.instituicao) : <CreditCard size={18} />}
             </span>
           </div>
           {cartoes.length > 1 && (
@@ -115,8 +116,12 @@ export default function DashboardCards({
 
       <article className="surface-interactive metric-enter p-5 sm:col-span-2 xl:col-span-4">
         <div className="flex items-center justify-between gap-4">
-          <div><p className="text-sm text-muted-foreground">Progresso da lista</p><p className="mt-1 text-lg font-semibold">{progresso}% concluído</p></div>
-          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><TrendingUp size={21} /></span>
+          <div>
+            <p className="text-sm text-muted-foreground">Lista do período</p>
+            <p className="mt-1 text-lg font-semibold">{comprados} de {total} itens comprados</p>
+            <p className="mt-1 text-xs text-muted-foreground">{pendentes} pendentes · {movimentacoes} movimentações financeiras</p>
+          </div>
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={21} /></span>
         </div>
         <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out" style={{ width: `${progresso}%` }} /></div>
       </article>

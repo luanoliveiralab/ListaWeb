@@ -1,13 +1,6 @@
 "use client";
 
-import {
-    PieChart,
-    Pie,
-    Cell,
-    ResponsiveContainer,
-    Tooltip,
-    Legend,
-} from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import type { Movimentacao } from "@/types/Movimentacao";
 
@@ -17,104 +10,97 @@ interface Props {
     onCategoriaSelect?: (categoria: string) => void;
 }
 
-const COLORS = [
-    "#3b82f6",
-    "#8b5cf6",
-    "#ec4899",
-    "#f97316",
-    "#eab308",
-    "#22c55e",
-    "#14b8a6",
-    "#06b6d4",
-    "#6366f1",
-    "#f43f5e",
-];
+const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#14b8a6", "#64748b"];
+const moeda = (valor: number) => valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function FinancePieChart({
     movimentacoes,
     categoriaSelecionada = "",
     onCategoriaSelect,
 }: Props) {
-    const data = movimentacoes
-        .filter((m) => m.tipo === "despesa")
+    const categorias = movimentacoes
+        .filter((mov) => mov.tipo === "despesa")
         .reduce((acc, mov) => {
-            const categoria = acc.find(
-                (item) => item.name === mov.categoria
-            );
-
-            if (categoria) {
-                categoria.value += Number(mov.valor);
-            } else {
-                acc.push({
-                    name: mov.categoria,
-                    value: Number(mov.valor),
-                });
-            }
-
+            acc.set(mov.categoria, (acc.get(mov.categoria) ?? 0) + Number(mov.valor));
             return acc;
-        }, [] as { name: string; value: number }[]);
-    if (data.length === 0) {
-        return (
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-xl font-bold">
-                    Gastos por Categoria
-                </h2>
+        }, new Map<string, number>());
+    const ordenadas = [...categorias.entries()]
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+    const principais = ordenadas.slice(0, 5);
+    const restante = ordenadas.slice(5).reduce((soma, item) => soma + item.value, 0);
+    const data = restante > 0 ? [...principais, { name: "Outros", value: restante }] : principais;
+    const total = data.reduce((soma, item) => soma + item.value, 0);
 
-                <div className="flex h-80 items-center justify-center text-muted-foreground">
+    return (
+        <section className="surface overflow-hidden p-5 sm:p-6">
+            <header>
+                <p className="text-sm font-medium text-primary">Distribuição das despesas</p>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight">Onde você mais gastou</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Categorias com maior impacto no período</p>
+            </header>
+
+            {!data.length ? (
+                <div className="flex h-80 items-center justify-center text-sm text-muted-foreground">
                     Nenhuma despesa registrada neste período.
                 </div>
-            </div>
-        );
-    }
-    return (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-bold">
-                Gastos por Categoria
-            </h2>
-
-            <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={data}
-                            dataKey="value"
-                            outerRadius={110}
-                            label
-                            cursor="pointer"
-                            onClick={(_, index) =>
-                                onCategoriaSelect?.(
-                                    categoriaSelecionada === data[index].name
-                                        ? ""
-                                        : data[index].name
-                                )
-                            }
-                        >
-                            {data.map((_, index) => (
-                                <Cell
-                                    key={index}
-                                    fill={COLORS[index % COLORS.length]}
-                                    opacity={
-                                        categoriaSelecionada &&
-                                        categoriaSelecionada !== data[index].name
-                                            ? 0.28
-                                            : 1
-                                    }
+            ) : (
+                <div className="mt-5 grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)]">
+                    <div className="relative h-64 min-w-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={data}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    innerRadius={66}
+                                    outerRadius={100}
+                                    paddingAngle={2}
+                                    cursor={onCategoriaSelect ? "pointer" : "default"}
+                                    onClick={(_, index) => onCategoriaSelect?.(
+                                        categoriaSelecionada === data[index].name ? "" : data[index].name
+                                    )}
+                                >
+                                    {data.map((item, index) => (
+                                        <Cell
+                                            key={item.name}
+                                            fill={COLORS[index % COLORS.length]}
+                                            opacity={categoriaSelecionada && categoriaSelecionada !== item.name ? 0.28 : 1}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    formatter={(value) => moeda(Number(value ?? 0))}
+                                    contentStyle={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }}
                                 />
-                            ))}
-                        </Pie>
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-xs text-muted-foreground">Total gasto</span>
+                            <strong className="mt-1 text-lg tabular-nums">{moeda(total)}</strong>
+                        </div>
+                    </div>
 
-                        <Tooltip
-                            formatter={(value) =>
-                                Number(value ?? 0).toLocaleString("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                })
-                            }
-                        />
-                        <Legend iconType="circle" />
-                    </PieChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+                    <div className="space-y-3">
+                        {data.map((item, index) => (
+                            <button
+                                type="button"
+                                key={item.name}
+                                className="flex w-full items-center gap-3 rounded-xl p-1.5 text-left transition hover:bg-muted disabled:pointer-events-none"
+                                onClick={() => onCategoriaSelect?.(categoriaSelecionada === item.name ? "" : item.name)}
+                                disabled={!onCategoriaSelect}
+                            >
+                                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>
+                                <span className="text-right text-xs tabular-nums text-muted-foreground">
+                                    {Math.round((item.value / total) * 100)}%
+                                    <span className="ml-2 hidden sm:inline">{moeda(item.value)}</span>
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </section>
     );
 }

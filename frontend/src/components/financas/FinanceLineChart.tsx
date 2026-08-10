@@ -77,9 +77,13 @@ export default function FinanceLineChart({ movimentacoes }: Props) {
         pontos.set(chave, ponto);
     });
 
-    const dados = [...pontos.values()]
+    const dadosOrdenados = [...pontos.values()]
         .sort((a, b) => a.chave.localeCompare(b.chave))
         .slice(-12);
+    const dados = dadosOrdenados.reduce<PontoGrafico[]>((acumulados, ponto) => {
+        const saldoAnterior = acumulados.at(-1)?.saldo ?? 0;
+        return [...acumulados, { ...ponto, saldo: saldoAnterior + ponto.receitas - ponto.despesas }];
+    }, []);
     const totais = movimentacoes.reduce(
         (acc, movimentacao) => {
             acc[movimentacao.tipo === "receita" ? "receitas" : "despesas"] +=
@@ -99,7 +103,7 @@ export default function FinanceLineChart({ movimentacoes }: Props) {
                         Evolução financeira
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        {exibirPorDia ? "Movimentação diária" : "Últimos 12 meses com atividade"}
+                        {exibirPorDia ? "Entradas, despesas e resultado acumulado no mês" : "Últimos 12 meses com atividade"}
                     </p>
                 </div>
 
@@ -111,7 +115,7 @@ export default function FinanceLineChart({ movimentacoes }: Props) {
                         Despesas {formatarMoeda(totais.despesas)}
                     </span>
                     <span className="rounded-full bg-blue-500/10 px-3 py-1.5 text-blue-700 dark:text-blue-300">
-                        Saldo {formatarMoeda(saldo)}
+                        Resultado {formatarMoeda(saldo)}
                     </span>
                 </div>
             </header>
