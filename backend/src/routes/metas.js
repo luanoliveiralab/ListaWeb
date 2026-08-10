@@ -14,12 +14,16 @@ router.get("/", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
     const { nome, valor_alvo, valor_atual = 0, prazo } = req.body;
-    if (!nome?.trim() || !(Number(valor_alvo) > 0) || Number(valor_atual) < 0) return res.status(400).json({ mensagem: "Dados da meta inválidos." });
+    const valorAlvo = Number(valor_alvo);
+    const valorAtualInicial = Number(valor_atual);
+    if (!nome?.trim() || !Number.isFinite(valorAlvo) || valorAlvo <= 0 || !Number.isFinite(valorAtualInicial) || valorAtualInicial < 0) {
+        return res.status(400).json({ mensagem: "Dados da meta inválidos." });
+    }
     try {
         const result = await pool.query(
             `INSERT INTO metas (usuario_id, nome, valor_alvo, valor_atual, prazo, concluida)
-             VALUES ($1,$2,$3,$4,$5,$4 >= $3) RETURNING *`,
-            [req.usuarioId, nome.trim(), Number(valor_alvo), Number(valor_atual), prazo || null]
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+            [req.usuarioId, nome.trim(), valorAlvo, valorAtualInicial, prazo || null, valorAtualInicial >= valorAlvo]
         );
         return res.status(201).json(result.rows[0]);
     } catch (error) { return next(error); }

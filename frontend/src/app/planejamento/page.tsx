@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { CalendarClock, CheckCircle2, Pause, Play, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarClock, CheckCircle2, Pause, Play, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useUsuario } from "@/hooks/useUsuario";
 import { useToast } from "@/providers/ToastProvider";
@@ -15,6 +15,7 @@ import { orcamentosService } from "@/services/orcamentos.service";
 import { usePeriod } from "@/context/PeriodContext";
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const numeroMoeda = (valor: string) => Number(valor.includes(",") ? valor.replace(/\./g, "").replace(",", ".") : valor);
 const categorias = ["Mercado", "Moradia", "Transporte", "Saúde", "Educação", "Lazer", "Salário", "Freelance", "Investimentos", "Outros"];
 
 export default function PlanejamentoPage() {
@@ -30,6 +31,8 @@ export default function PlanejamentoPage() {
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [historico, setHistorico] = useState<MetaMovimentacao[]>([]);
   const [movimento, setMovimento] = useState({ tipo: "deposito", valor: "", observacao: "" });
+  const [recorrenciaAberta, setRecorrenciaAberta] = useState(false);
+  const [metaAberta, setMetaAberta] = useState(false);
 
   useEffect(() => {
     if (!usuario) return;
@@ -78,6 +81,7 @@ export default function PlanejamentoPage() {
       const nova = await planejamentoService.criarRecorrencia({ ...rec, valor: Number(rec.valor.replace(",", ".")), dia: Number(rec.dia) });
       setRecorrencias((itens) => [nova, ...itens]);
       setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
+      setRecorrenciaAberta(false);
       mostrarAviso("Recorrência criada.");
     } catch (error) {
       mostrarAviso(error instanceof Error ? error.message : "Dados inválidos.", "erro");
@@ -87,9 +91,10 @@ export default function PlanejamentoPage() {
   async function criarMeta(event: FormEvent) {
     event.preventDefault();
     try {
-      const nova = await planejamentoService.criarMeta({ nome: meta.nome, valor_alvo: Number(meta.valor_alvo.replace(",", ".")), valor_atual: Number(meta.valor_atual.replace(",", ".") || 0), prazo: meta.prazo || null });
+      const nova = await planejamentoService.criarMeta({ nome: meta.nome.trim(), valor_alvo: numeroMoeda(meta.valor_alvo), valor_atual: meta.valor_atual ? numeroMoeda(meta.valor_atual) : 0, prazo: meta.prazo || null });
       setMetas((itens) => [nova, ...itens]);
       setMeta({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
+      setMetaAberta(false);
       mostrarAviso("Meta criada.");
     } catch (error) {
       mostrarAviso(error instanceof Error ? error.message : "Dados inválidos.", "erro");
@@ -145,18 +150,18 @@ export default function PlanejamentoPage() {
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
         <section className="surface p-5 sm:p-6">
-          <div className="section-header">
-            <h2 className="section-title flex items-center gap-2"><CalendarClock size={21} /> Recorrências mensais</h2>
-            <p className="section-description">Cadastre contas e recebimentos que se repetem todos os meses.</p>
+          <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${recorrenciaAberta ? "mb-6" : ""}`}>
+            <div><h2 className="section-title flex items-center gap-2"><CalendarClock size={21} /> Recorrências mensais</h2><p className="section-description">Cadastre contas e recebimentos que se repetem todos os meses.</p></div>
+            {!recorrenciaAberta && <button type="button" onClick={() => setRecorrenciaAberta(true)} className="button-primary shrink-0"><Plus size={17} /> Criar recorrência</button>}
           </div>
-          <form onSubmit={criarRecorrencia} className="form-grid">
+          {recorrenciaAberta && <form onSubmit={criarRecorrencia} className="form-grid animate-in border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300">
             <div className="field-group"><label className="field-label" htmlFor="tipo-recorrencia">Tipo</label><select id="tipo-recorrencia" className="control" value={rec.tipo} onChange={(e) => setRec({ ...rec, tipo: e.target.value })}><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
             <div className="field-group"><label className="field-label" htmlFor="descricao-recorrencia">Descrição</label><input id="descricao-recorrencia" className="control" placeholder="Ex.: Aluguel" value={rec.descricao} onChange={(e) => setRec({ ...rec, descricao: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="valor-recorrencia">Valor (R$)</label><input id="valor-recorrencia" className="control" placeholder="R$ 0,00" inputMode="decimal" value={rec.valor} onChange={(e) => setRec({ ...rec, valor: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="categoria-recorrencia">Categoria</label><select id="categoria-recorrencia" className="control" value={rec.categoria} onChange={(e) => setRec({ ...rec, categoria: e.target.value })} required><option value="" disabled>Selecionar categoria</option>{categorias.map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}</select></div>
             <div className="field-group"><label className="field-label" htmlFor="dia-recorrencia">Dia do lançamento</label><input id="dia-recorrencia" className="control" type="number" min="1" max="28" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></div>
-            <div className="flex items-end"><button className="button-primary h-11 w-full">Adicionar recorrência</button></div>
-          </form>
+            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" }); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Adicionar recorrência</button></div>
+          </form>}
 
           <div className="planning-list">
             {recorrencias.map((item) => {
@@ -173,17 +178,17 @@ export default function PlanejamentoPage() {
         </section>
 
         <section className="surface p-5 sm:p-6">
-          <div className="section-header">
-            <h2 className="section-title flex items-center gap-2"><Target size={21} /> Metas financeiras</h2>
-            <p className="section-description">Transforme seus objetivos em valores claros e acompanhe cada avanço.</p>
+          <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${metaAberta ? "mb-6" : ""}`}>
+            <div><h2 className="section-title flex items-center gap-2"><Target size={21} /> Metas financeiras</h2><p className="section-description">Transforme seus objetivos em valores claros e acompanhe cada avanço.</p></div>
+            {!metaAberta && <button type="button" onClick={() => setMetaAberta(true)} className="button-primary shrink-0"><Plus size={17} /> Criar meta</button>}
           </div>
-          <form onSubmit={criarMeta} className="form-grid">
+          {metaAberta && <form onSubmit={criarMeta} className="form-grid animate-in border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300">
             <div className="field-group"><label className="field-label" htmlFor="nome-meta">Nome da meta</label><input id="nome-meta" className="control" placeholder="Ex.: Reserva de emergência" value={meta.nome} onChange={(e) => setMeta({ ...meta, nome: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="alvo-meta">Valor alvo (R$)</label><input id="alvo-meta" className="control" placeholder="R$ 0,00" inputMode="decimal" value={meta.valor_alvo} onChange={(e) => setMeta({ ...meta, valor_alvo: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="atual-meta">Valor já guardado (R$)</label><input id="atual-meta" className="control" placeholder="R$ 0,00" inputMode="decimal" value={meta.valor_atual} onChange={(e) => setMeta({ ...meta, valor_atual: e.target.value })} /></div>
             <div className="field-group"><label className="field-label" htmlFor="prazo-meta">Prazo opcional</label><input id="prazo-meta" className="control [color-scheme:light] dark:[color-scheme:dark]" type="date" value={meta.prazo} onChange={(e) => setMeta({ ...meta, prazo: e.target.value })} /></div>
-            <button className="button-primary h-11 md:col-span-2">Criar meta</button>
-          </form>
+            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setMeta({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" }); setMetaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Salvar meta</button></div>
+          </form>}
 
           <div className="planning-list">
             {metas.map((item) => {
