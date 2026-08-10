@@ -54,3 +54,37 @@ Não inclua senhas, dados bancários ou informações financeiras reais.
 - Classificação: melhoria de produto; prioridade sugerida: média.
 - Critério inicial recomendado: avisos únicos em 50%, 80% e 100%, exibidos dentro do aplicativo, sem notificações externas nesta primeira versão.
 - Situação: implementado em 10/08/2026 nas páginas Finanças e Planejamento, com persistência dos marcos no dispositivo e presença contínua no centro de notificações.
+
+### F04 — Caixa de notificações fora da tela no mobile — 10/08/2026
+
+- Classificação: bug visual de prioridade baixa.
+- Situação: corrigido; painel alinhado à viewport e protegido por teste em desktop e mobile.
+
+### F05 — Central completa de avisos — 10/08/2026
+
+- Sugestão: disponibilizar uma página de avisos na navegação além do acesso rápido pelo sino.
+- Classificação: melhoria de produto.
+- Situação: implementado em `/avisos`, com filtros, contador, leitura sincronizada e atalhos.
+
+### F06 — Indicador do sino piscando entre páginas — 10/08/2026
+
+- Classificação: bug visual de prioridade baixa.
+- Situação: corrigido; o estado de leitura agora é recuperado antes da primeira renderização da barra.
+
+### F07 — Forma de pagamento ao concluir item — 10/08/2026
+
+- Sugestão: perguntar se o item foi pago com saldo ou cartão ao marcá-lo como comprado.
+- Classificação: melhoria funcional de prioridade alta para o próximo ciclo.
+- Situação: backlog.
+
+### F08 — Identidade visual dos e-mails — 10/08/2026
+
+- Sugestão: aplicar um template responsivo e alinhado à marca aos e-mails enviados pela API.
+- Classificação: melhoria de experiência de prioridade média.
+- Situação: backlog.
+
+### F09 — Categorias disponíveis por página — 10/08/2026
+
+- Sugestão: permitir escolher se cada categoria aparece em Lista, Finanças e/ou Planejamento.
+- Classificação: melhoria de autonomia de prioridade média-alta.
+- Situação: backlog.

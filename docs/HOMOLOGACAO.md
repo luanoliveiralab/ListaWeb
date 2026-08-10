@@ -67,4 +67,29 @@ Enquanto os testadores convidados não estavam disponíveis, foi executada a eta
 - nomes acessíveis adicionados ao botão de tema, seletor de período e controle de modo escuro;
 - contraste do valor positivo no histórico aprimorado.
 
-Resultado: **etapa técnica aprovada**. A aprovação final da rodada continua dependendo da execução dos cenários obrigatórios pelos testadores convidados.
+Resultado: **etapa técnica aprovada**.
+
+## Encerramento da rodada — 10/08/2026
+
+### Evidências consolidadas
+
+- 19 testes do servidor aprovados;
+- 26 jornadas de interface aprovadas em desktop e mobile;
+- build de produção e auditoria de acessibilidade aprovados;
+- recebimento do e-mail de redefinição confirmado por uma testadora;
+- avaliações humanas positivas sobre layout, temas, Finanças, Metas e utilidade geral;
+- dois bugs visuais de notificações encontrados pelos testadores e corrigidos;
+- nenhum problema bloqueador ou de prioridade alta permaneceu aberto.
+
+### Decisão
+
+**Rodada 1 encerrada e aprovada para beta público, com ressalvas.**
+
+O produto pode continuar disponível para uso e coleta de feedback. Ele ainda não deve ser classificado como versão final estável porque não houve registro individual completo dos cenários H01 a H14 por todos os convidados. Essa ausência é uma limitação de evidência, não um bug confirmado.
+
+### Próximo ciclo
+
+1. Perguntar se a compra concluída na lista foi paga com saldo ou cartão.
+2. Aplicar identidade visual responsiva aos e-mails transacionais.
+3. Permitir definir em quais páginas cada categoria estará disponível.
+4. Reexecutar apenas os cenários afetados e os testes de regressão.
