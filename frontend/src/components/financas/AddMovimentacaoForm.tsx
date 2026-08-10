@@ -71,7 +71,7 @@ export default function AddMovimentacaoForm({
             <div><label className="field-label">Data</label><input type="date" value={data} onChange={(event) => setData(event.target.value)} className="control mt-2 [color-scheme:light] dark:[color-scheme:dark]" /></div>
           </div>
 
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="expandable-form-actions mt-6">
             <button type="button" onClick={cancelar} disabled={salvando} className="button-secondary">Cancelar</button>
             <button type="submit" disabled={salvando} className="button-primary h-11 px-6"><Plus size={17} /> {salvando ? "Adicionando..." : "Adicionar movimentação"}</button>
           </div>

@@ -73,11 +73,11 @@ export default function ListaPage() {
   // =========================
 
   async function adicionarItem() {
-    if (!usuario) return;
+    if (!usuario) return false;
 
     if (!itemNome.trim()) {
       mostrarAviso("Informe o nome do item.", "erro");
-      return;
+      return false;
     }
 
     if (
@@ -89,7 +89,7 @@ export default function ListaPage() {
         "Informe um valor válido para o item.",
         "erro"
       );
-      return;
+      return false;
     }
 
     if (!categoria) {
@@ -97,7 +97,7 @@ export default function ListaPage() {
         "Selecione uma categoria.",
         "erro"
       );
-      return;
+      return false;
     }
 
     try {
@@ -120,6 +120,7 @@ export default function ListaPage() {
         "Item adicionado com sucesso!",
         "sucesso"
       );
+      return true;
     } catch (err) {
       console.error("Erro ao adicionar item:", err);
 
@@ -127,6 +128,7 @@ export default function ListaPage() {
         "Erro ao adicionar item.",
         "erro"
       );
+      return false;
     }
   }
 

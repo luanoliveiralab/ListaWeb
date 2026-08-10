@@ -124,18 +124,18 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
               {Array.from({ length: 31 }, (_, index) => index + 1).map((dia) => <option key={dia} value={dia}>Dia {dia}</option>)}
             </select>
           </div>
-          <div className="flex gap-2 self-end xl:flex-col">
-            <button className="button-primary flex-1" disabled={salvando || !nome || !instituicaoFinal || !limite || !vencimento}>
-              <Plus size={17} /> {salvando ? "Salvando" : "Adicionar"}
-            </button>
-            <button type="button" onClick={cancelarCadastro} disabled={salvando} className="button-secondary flex-1">Cancelar</button>
-          </div>
           {instituicao === "Outra instituição" && (
             <div className="field-group md:col-span-2 xl:col-span-5">
               <label className="field-label" htmlFor="cartao-outra-instituicao">Nome da instituição</label>
               <input id="cartao-outra-instituicao" className="control max-w-md" maxLength={80} placeholder="Digite o nome da instituição" value={outraInstituicao} onChange={(e) => setOutraInstituicao(e.target.value)} required />
             </div>
           )}
+          <div className="expandable-form-actions md:col-span-2 xl:col-span-5">
+            <button type="button" onClick={cancelarCadastro} disabled={salvando} className="button-secondary">Cancelar</button>
+            <button className="button-primary" disabled={salvando || !nome || !instituicaoFinal || !limite || !vencimento}>
+              <Plus size={17} /> {salvando ? "Salvando" : "Adicionar cartão"}
+            </button>
+          </div>
         </form>
         )}
       </header>

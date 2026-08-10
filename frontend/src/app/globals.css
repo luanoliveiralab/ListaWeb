@@ -252,6 +252,14 @@
     @apply mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end;
   }
 
+  .expandable-form-actions {
+    @apply flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end;
+  }
+
+  .expandable-form-actions > button {
+    @apply w-full sm:w-auto sm:min-w-32;
+  }
+
   .table-shell {
     @apply mt-8 overflow-x-auto rounded-2xl border border-border bg-card text-card-foreground shadow-sm;
   }
