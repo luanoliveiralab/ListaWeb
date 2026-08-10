@@ -97,4 +97,9 @@ test("mantém header e formulário fixos enquanto apenas categorias rolam", asyn
   await page.getByRole("button", { name: "Editar Mercado" }).click();
   await expect(page.getByText("Despesas e compras")).toBeVisible();
   await expect(page.getByText("Editando categoria")).toBeVisible();
+  await page.getByRole("button", { name: "Excluir Mercado" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sim, excluir categoria" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).not.toBeVisible();
 });
