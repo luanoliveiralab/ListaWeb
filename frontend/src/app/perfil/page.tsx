@@ -7,6 +7,16 @@ import { useUsuario } from "@/hooks/useUsuario";
 import { useState } from "react";
 import { usuarioService } from "@/services/usuario.service";
 import { useToast } from "@/providers/ToastProvider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export default function PerfilPage() {
@@ -14,18 +24,16 @@ export default function PerfilPage() {
   const { mostrarAviso } = useToast();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [confirmarEmail, setConfirmarEmail] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
-  async function salvarPerfil() {
+  async function atualizarPerfil() {
     if (!usuario) return;
 
-    if (!nome && !email) {
-      mostrarAviso("Insira um novo nome ou e-mail.", "erro");
-      return;
-    }
+    const novoNome = nome.trim() || usuario.nome;
+    const novoEmail = email.trim() || usuario.email;
 
-    const novoNome = nome || usuario.nome;
-    const novoEmail = email || usuario.email;
-
+    setSalvando(true);
     try {
       const usuarioAtualizado = await usuarioService.atualizar(
         usuario.id,
@@ -36,13 +44,34 @@ export default function PerfilPage() {
       );
 
       setUsuario(usuarioAtualizado);
+      setNome("");
+      setEmail("");
+      setConfirmarEmail(false);
 
       mostrarAviso("Perfil atualizado com sucesso!", "sucesso");
-    } catch {
-      mostrarAviso("Erro ao atualizar perfil.", "erro");
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "Erro ao atualizar perfil.", "erro");
+    } finally {
+      setSalvando(false);
     }
   }
 
+  function salvarPerfil() {
+    if (!usuario) return;
+
+    if (!nome.trim() && !email.trim()) {
+      mostrarAviso("Insira um novo nome ou e-mail.", "erro");
+      return;
+    }
+
+    const emailMudou = Boolean(email.trim()) && email.trim().toLowerCase() !== usuario.email.toLowerCase();
+    if (emailMudou) {
+      setConfirmarEmail(true);
+      return;
+    }
+
+    atualizarPerfil();
+  }
 
 
   return (
@@ -70,6 +99,29 @@ export default function PerfilPage() {
 
         <PasswordForm />
       </div>
+
+      <AlertDialog open={confirmarEmail} onOpenChange={(aberto) => { if (!salvando) setConfirmarEmail(aberto); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alterar seu e-mail?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Seu e-mail de acesso será alterado de <strong>{usuario?.email}</strong> para <strong>{email.trim()}</strong>. Use o novo endereço no próximo login.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={salvando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={salvando}
+              onClick={(event) => {
+                event.preventDefault();
+                atualizarPerfil();
+              }}
+            >
+              {salvando ? "Alterando..." : "Sim, alterar e-mail"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
