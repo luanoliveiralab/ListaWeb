@@ -4,11 +4,9 @@ import { useMemo, useState } from "react";
 import {
     ArrowDownRight,
     ArrowUpRight,
-    Download,
     Pencil,
     Printer,
     Search,
-    SlidersHorizontal,
     Trash2,
 } from "lucide-react";
 
@@ -37,14 +35,9 @@ export default function FinanceTable({
     onEditar,
     onExcluir,
     categoriaSelecionada = "",
-    onCategoriaChange,
 }: Props) {
     const [pesquisa, setPesquisa] = useState("");
     const [filtro, setFiltro] = useState<Filtro>("todas");
-    const [dataInicial, setDataInicial] = useState("");
-    const [dataFinal, setDataFinal] = useState("");
-    const [valorMinimo, setValorMinimo] = useState("");
-    const [valorMaximo, setValorMaximo] = useState("");
 
     const movimentacoesVisiveis = useMemo(() => {
         const termo = pesquisa.trim().toLocaleLowerCase("pt-BR");
@@ -58,23 +51,9 @@ export default function FinanceTable({
                 movimentacao.categoria.toLocaleLowerCase("pt-BR").includes(termo);
             const correspondeACategoria =
                 !categoriaSelecionada || movimentacao.categoria === categoriaSelecionada;
-            const dataMovimentacao = movimentacao.data.slice(0, 10);
-            const correspondeAData =
-                (!dataInicial || dataMovimentacao >= dataInicial) &&
-                (!dataFinal || dataMovimentacao <= dataFinal);
-            const valor = Number(movimentacao.valor);
-            const correspondeAoValor =
-                (!valorMinimo || valor >= Number(valorMinimo)) &&
-                (!valorMaximo || valor <= Number(valorMaximo));
-
-            return correspondeAoTipo && correspondeAoTermo && correspondeACategoria && correspondeAData && correspondeAoValor;
+            return correspondeAoTipo && correspondeAoTermo && correspondeACategoria;
         });
-    }, [categoriaSelecionada, dataFinal, dataInicial, filtro, movimentacoes, pesquisa, valorMaximo, valorMinimo]);
-
-    const categorias = useMemo(
-        () => [...new Set(movimentacoes.map((mov) => mov.categoria))].sort(),
-        [movimentacoes]
-    );
+    }, [categoriaSelecionada, filtro, movimentacoes, pesquisa]);
 
     const resumo = movimentacoesVisiveis.reduce(
         (acc, mov) => {
@@ -91,53 +70,7 @@ export default function FinanceTable({
         filtro !== "todas" ? `Tipo: ${filtro}` : "",
         categoriaSelecionada ? `Categoria: ${categoriaSelecionada}` : "",
         pesquisa ? `Busca: ${pesquisa}` : "",
-        dataInicial ? `A partir de: ${new Date(`${dataInicial}T12:00:00`).toLocaleDateString("pt-BR")}` : "",
-        dataFinal ? `Até: ${new Date(`${dataFinal}T12:00:00`).toLocaleDateString("pt-BR")}` : "",
-        valorMinimo ? `Valor mínimo: ${formatarValor(Number(valorMinimo))}` : "",
-        valorMaximo ? `Valor máximo: ${formatarValor(Number(valorMaximo))}` : "",
     ].filter(Boolean);
-
-    function exportarCsv() {
-        const escapar = (valor: string | number) => {
-            const texto = String(valor);
-            const seguro = /^[=+\-@]/.test(texto.trimStart()) ? `'${texto}` : texto;
-            return `"${seguro.replaceAll('"', '""')}"`;
-        };
-        const linhas = movimentacoesVisiveis.map((mov) => [
-            mov.id,
-            new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR"),
-            mov.tipo === "receita" ? "Receita" : "Despesa",
-            mov.descricao,
-            mov.categoria,
-            mov.quantidade ?? "",
-            Number(mov.valor).toFixed(2).replace(".", ","),
-            mov.quantidade != null ? "Lista de compras" : "Lançamento manual",
-        ].map(escapar).join(";"));
-        const cabecalho = [
-            "sep=;",
-            "LISTAWEB - RELATÓRIO FINANCEIRO",
-            `Gerado em;${new Date().toLocaleString("pt-BR")}`,
-            `Filtros aplicados;${filtrosAtivos.join(" | ") || "Nenhum"}`,
-            "",
-            "RESUMO",
-            `Quantidade de registros;${movimentacoesVisiveis.length}`,
-            `Total de receitas;${resumo.receitas.toFixed(2).replace(".", ",")}`,
-            `Total de despesas;${resumo.despesas.toFixed(2).replace(".", ",")}`,
-            `Saldo;${saldoRelatorio.toFixed(2).replace(".", ",")}`,
-            `Ticket médio;${ticketMedio.toFixed(2).replace(".", ",")}`,
-            `Categorias distintas;${new Set(movimentacoesVisiveis.map((mov) => mov.categoria)).size}`,
-            "",
-            "DETALHAMENTO",
-            "ID;Data;Tipo;Descrição;Categoria;Quantidade;Valor (R$);Origem",
-        ];
-        const csv = [...cabecalho, ...linhas].join("\r\n");
-        const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `listaweb-relatorio-${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
-    }
 
     function imprimirRelatorio() {
         const tituloAnterior = document.title;
@@ -146,16 +79,6 @@ export default function FinanceTable({
         window.setTimeout(() => {
             document.title = tituloAnterior;
         }, 500);
-    }
-
-    function limparFiltros() {
-        setFiltro("todas");
-        setPesquisa("");
-        setDataInicial("");
-        setDataFinal("");
-        setValorMinimo("");
-        setValorMaximo("");
-        onCategoriaChange?.("");
     }
 
     const quantidadeReceitas = movimentacoes.filter(
@@ -235,27 +158,7 @@ export default function FinanceTable({
                     ))}
                 </div>
 
-                <details className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
-                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
-                        <SlidersHorizontal size={17} /> Filtros avançados
-                    </summary>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <select value={categoriaSelecionada} onChange={(event) => onCategoriaChange?.(event.target.value)} className="control">
-                            <option value="">Todas as categorias</option>
-                            {categorias.map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}
-                        </select>
-                        <input type="date" value={dataInicial} onChange={(event) => setDataInicial(event.target.value)} className="control" aria-label="Data inicial" />
-                        <input type="date" value={dataFinal} onChange={(event) => setDataFinal(event.target.value)} className="control" aria-label="Data final" />
-                        <input type="number" min="0" step="0.01" value={valorMinimo} onChange={(event) => setValorMinimo(event.target.value)} placeholder="Valor mínimo" className="control" />
-                        <input type="number" min="0" step="0.01" value={valorMaximo} onChange={(event) => setValorMaximo(event.target.value)} placeholder="Valor máximo" className="control" />
-                    </div>
-                    <button type="button" onClick={limparFiltros} className="mt-3 text-sm font-medium text-primary hover:underline">Limpar filtros</button>
-                </details>
-
                 <div className="mt-4 flex flex-wrap gap-2 print:hidden">
-                    <button type="button" onClick={exportarCsv} disabled={movimentacoesVisiveis.length === 0} className="button-secondary">
-                        <Download size={17} /> Exportar CSV
-                    </button>
                     <button type="button" onClick={imprimirRelatorio} disabled={movimentacoesVisiveis.length === 0} className="button-secondary">
                         <Printer size={17} /> Salvar em PDF
                     </button>
