@@ -1,6 +1,36 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { cookieOptions, protegerCsrf, limitarTentativas, limparTodasTentativas } = require("../src/security");
+const { HttpError, criarContextoRequisicao, idPositivo, periodoValido, tratarErro } = require("../src/http");
+
+test("valida identificadores e períodos da API", () => {
+    assert.equal(idPositivo("12"), 12);
+    assert.deepEqual(periodoValido("8", "2026"), { mes: 8, ano: 2026 });
+    assert.throws(() => idPositivo("0"), (erro) => erro instanceof HttpError && erro.codigo === "ID_INVALIDO");
+    assert.throws(() => periodoValido("13", "2026"), (erro) => erro instanceof HttpError && erro.codigo === "PERIODO_INVALIDO");
+});
+
+test("atribui um identificador seguro a cada requisição", () => {
+    const headers = {};
+    const req = { headers: { "x-request-id": "fluxo-seguro_123" } };
+    criarContextoRequisicao(req, { setHeader(nome, valor) { headers[nome] = valor; } }, () => {});
+    assert.equal(req.requestId, "fluxo-seguro_123");
+    assert.equal(headers["X-Request-Id"], "fluxo-seguro_123");
+
+    const reqInvalida = { headers: { "x-request-id": "quebra\nlinha" } };
+    criarContextoRequisicao(reqInvalida, { setHeader() {} }, () => {});
+    assert.match(reqInvalida.requestId, /^[0-9a-f-]{36}$/);
+});
+
+test("retorna erros operacionais com código e identificador", () => {
+    const res = {
+        status(codigo) { this.statusCode = codigo; return this; },
+        json(payload) { this.payload = payload; return this; },
+    };
+    tratarErro(new HttpError(404, "Não encontrado.", "NAO_ENCONTRADO"), { requestId: "req-1" }, res);
+    assert.equal(res.statusCode, 404);
+    assert.deepEqual(res.payload, { mensagem: "Não encontrado.", codigo: "NAO_ENCONTRADO", requestId: "req-1" });
+});
 
 test("cookie de autenticação não fica acessível ao JavaScript", () => {
     const options = cookieOptions();

@@ -14,6 +14,7 @@ const { autenticar } = require("./src/middleware/autenticar");
 const { cookieOptions, csrfCookieOptions, criarTokenCsrf, protegerCsrf, limitarTentativas, limparTentativas } = require("./src/security");
 const recorrenciasRouter = require("./src/routes/recorrencias");
 const metasRouter = require("./src/routes/metas");
+const { criarContextoRequisicao, rotaNaoEncontrada, tratarErro } = require("./src/http");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -44,7 +45,8 @@ app.use(
             return callback(new Error("Origem não permitida pelo CORS."));
         },
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Request-Id"],
+        exposedHeaders: ["X-Request-Id"],
         credentials: true,
     })
 );
@@ -55,6 +57,7 @@ app.use((req, res, next) => {
     next();
 });
 app.use(express.json({ limit: "4mb" }));
+app.use(criarContextoRequisicao);
 
 app.get("/csrf", (req, res) => {
     const csrfToken = criarTokenCsrf();
@@ -2512,24 +2515,8 @@ app.get("/", (req, res) => {
 // TRATAMENTO DE ERRO
 // =====================================================
 
-app.use(
-    (
-        err,
-        req,
-        res,
-        next
-    ) => {
-        console.error(
-            "Erro não tratado:",
-            err
-        );
-
-        return res.status(500).json({
-            mensagem:
-                "Erro interno do servidor.",
-        });
-    }
-);
+app.use(rotaNaoEncontrada);
+app.use(tratarErro);
 
 // =====================================================
 // START SERVER

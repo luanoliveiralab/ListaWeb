@@ -1,14 +1,10 @@
 const express = require("express");
 const { pool } = require("../db");
 const { autenticar } = require("../middleware/autenticar");
+const { idPositivo, periodoValido } = require("../http");
 
 const router = express.Router();
 router.use(autenticar);
-
-function idValido(valor) {
-    const id = Number(valor);
-    return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 router.get("/", async (req, res, next) => {
     try {
@@ -33,8 +29,8 @@ router.post("/", async (req, res, next) => {
 });
 
 router.put("/:id", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da recorrência inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da recorrência"); } catch (error) { return next(error); }
     try {
         const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [Boolean(req.body.ativa), id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
@@ -43,8 +39,8 @@ router.put("/:id", async (req, res, next) => {
 });
 
 router.delete("/:id", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da recorrência inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da recorrência"); } catch (error) { return next(error); }
     try {
         const result = await pool.query("DELETE FROM recorrencias WHERE id = $1 AND usuario_id = $2 RETURNING id", [id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
@@ -54,9 +50,11 @@ router.delete("/:id", async (req, res, next) => {
 
 router.post("/gerar", async (req, res, next) => {
     const hoje = new Date();
-    const mes = Number(req.body.mes ?? hoje.getMonth() + 1);
-    const ano = Number(req.body.ano ?? hoje.getFullYear());
-    if (mes < 1 || mes > 12 || ano < 2000 || ano > 2200) return res.status(400).json({ mensagem: "Período inválido." });
+    let mes;
+    let ano;
+    try {
+        ({ mes, ano } = periodoValido(req.body.mes ?? hoje.getMonth() + 1, req.body.ano ?? hoje.getFullYear()));
+    } catch (error) { return next(error); }
     try {
         const result = await pool.query(
             `INSERT INTO movimentacoes (usuario_id, tipo, descricao, valor, categoria, data, recorrencia_id)

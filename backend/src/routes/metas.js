@@ -1,14 +1,10 @@
 const express = require("express");
 const { pool } = require("../db");
 const { autenticar } = require("../middleware/autenticar");
+const { idPositivo } = require("../http");
 
 const router = express.Router();
 router.use(autenticar);
-
-function idValido(valor) {
-    const id = Number(valor);
-    return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 router.get("/", async (req, res, next) => {
     try {
@@ -35,8 +31,8 @@ router.post("/", async (req, res, next) => {
 });
 
 router.put("/:id", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da meta inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da meta"); } catch (error) { return next(error); }
     const valorAtual = Number(req.body.valor_atual);
     if (valorAtual < 0 || !Number.isFinite(valorAtual)) return res.status(400).json({ mensagem: "Valor inválido." });
     try {
@@ -51,8 +47,8 @@ router.put("/:id", async (req, res, next) => {
 });
 
 router.delete("/:id", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da meta inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da meta"); } catch (error) { return next(error); }
     try {
         const result = await pool.query("DELETE FROM metas WHERE id = $1 AND usuario_id = $2 RETURNING id", [id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Meta não encontrada." });
@@ -61,8 +57,8 @@ router.delete("/:id", async (req, res, next) => {
 });
 
 router.get("/:id/historico", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da meta inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da meta"); } catch (error) { return next(error); }
     try {
         const result = await pool.query(
             `SELECT mm.id, mm.tipo, mm.valor, mm.observacao, mm.created_at
@@ -75,8 +71,8 @@ router.get("/:id/historico", async (req, res, next) => {
 });
 
 router.post("/:id/movimentar", async (req, res, next) => {
-    const id = idValido(req.params.id);
-    if (!id) return res.status(400).json({ mensagem: "ID da meta inválido." });
+    let id;
+    try { id = idPositivo(req.params.id, "ID da meta"); } catch (error) { return next(error); }
     const { tipo, valor, observacao } = req.body;
     const valorNumero = Number(valor);
     if (!["deposito", "retirada"].includes(tipo) || !Number.isFinite(valorNumero) || valorNumero <= 0 || (observacao && String(observacao).length > 255)) {
