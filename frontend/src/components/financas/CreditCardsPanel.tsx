@@ -49,6 +49,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   const [vencimento, setVencimento] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [removendo, setRemovendo] = useState<number | null>(null);
+  const [formularioAberto, setFormularioAberto] = useState(false);
 
   const instituicaoFinal = instituicao === "Outra instituição" ? outraInstituicao.trim() : instituicao;
 
@@ -62,6 +63,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
     try {
       await onAdicionar({ nome: nome.trim(), instituicao: instituicaoFinal, limite_disponivel: valor, dia_vencimento: dia });
       setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento("");
+      setFormularioAberto(false);
     } catch {
       // O componente pai exibe a mensagem adequada sem limpar o formulário.
     } finally {
@@ -74,19 +76,32 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
     try { await onRemover(id); } finally { setRemovendo(null); }
   }
 
+  function cancelarCadastro() {
+    setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento("");
+    setFormularioAberto(false);
+  }
+
   return (
     <section className="surface mt-6 overflow-hidden">
       <header className="border-b border-border p-5 sm:p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><CreditCard size={22} /></span>
-          <div>
-            <p className="text-sm font-medium text-primary">Meus cartões</p>
-            <h2 className="text-xl font-semibold">Limites e vencimentos</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Tenha seus cartões e limites disponíveis sempre à vista.</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><CreditCard size={22} /></span>
+            <div>
+              <p className="text-sm font-medium text-primary">Meus cartões</p>
+              <h2 className="text-xl font-semibold">Limites e vencimentos</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Tenha seus cartões e limites disponíveis sempre à vista.</p>
+            </div>
           </div>
+          {!formularioAberto && (
+            <button type="button" onClick={() => setFormularioAberto(true)} disabled={cartoes.length >= 4} className="button-primary shrink-0">
+              <Plus size={17} /> {cartoes.length >= 4 ? "Limite atingido" : "Criar novo cartão"}
+            </button>
+          )}
         </div>
 
-        <form onSubmit={salvar} className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_.75fr_auto]">
+        {formularioAberto && cartoes.length < 4 && (
+        <form onSubmit={salvar} className="mt-5 grid animate-in gap-3 border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_.75fr_auto]">
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-nome">Nome do cartão</label>
             <input id="cartao-nome" className="control" maxLength={80} placeholder="Ex.: Cartão principal" value={nome} onChange={(e) => setNome(e.target.value)} required />
@@ -109,9 +124,12 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
               {Array.from({ length: 31 }, (_, index) => index + 1).map((dia) => <option key={dia} value={dia}>Dia {dia}</option>)}
             </select>
           </div>
-          <button className="button-primary self-end" disabled={salvando || !nome || !instituicaoFinal || !limite || !vencimento}>
-            <Plus size={17} /> {salvando ? "Salvando" : "Adicionar"}
-          </button>
+          <div className="flex gap-2 self-end xl:flex-col">
+            <button className="button-primary flex-1" disabled={salvando || !nome || !instituicaoFinal || !limite || !vencimento}>
+              <Plus size={17} /> {salvando ? "Salvando" : "Adicionar"}
+            </button>
+            <button type="button" onClick={cancelarCadastro} disabled={salvando} className="button-secondary flex-1">Cancelar</button>
+          </div>
           {instituicao === "Outra instituição" && (
             <div className="field-group md:col-span-2 xl:col-span-5">
               <label className="field-label" htmlFor="cartao-outra-instituicao">Nome da instituição</label>
@@ -119,6 +137,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
             </div>
           )}
         </form>
+        )}
       </header>
 
       {carregando ? (
@@ -126,7 +145,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
       ) : cartoes.length === 0 ? (
         <div className="flex flex-col items-center p-8 text-center text-sm text-muted-foreground">
           <Building2 className="mb-3 opacity-50" size={30} />
-          Nenhum cartão cadastrado. Adicione o primeiro acima.
+          Nenhum cartão cadastrado. Use “Criar novo cartão” para começar.
         </div>
       ) : (
         <div className="grid gap-5 p-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 sm:p-6">

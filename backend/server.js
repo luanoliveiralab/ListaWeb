@@ -2240,6 +2240,14 @@ app.post("/cartoes", autenticar, async (req, res) => {
     }
 
     try {
+        const quantidade = await pool.query(
+            "SELECT COUNT(*)::int AS total FROM cartoes WHERE usuario_id = $1",
+            [req.usuarioId]
+        );
+        if (quantidade.rows[0].total >= 4) {
+            return res.status(400).json({ mensagem: "Você pode cadastrar no máximo 4 cartões." });
+        }
+
         const result = await pool.query(
             `INSERT INTO cartoes (usuario_id, nome, instituicao, limite_disponivel, dia_vencimento)
              VALUES ($1, $2, $3, $4, $5)
