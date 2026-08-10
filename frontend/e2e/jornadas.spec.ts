@@ -71,14 +71,20 @@ test("centraliza, filtra e marca avisos como lidos", async ({ page }) => {
   await page.getByPlaceholder("E-mail").fill(usuario.email);
   await page.getByPlaceholder("Senha").fill("senha-segura-123");
   await page.getByRole("button", { name: "Entrar" }).click();
-  await page.goto("/avisos");
+  await page.getByRole("link", { name: "Avisos" }).click();
+  await expect(page).toHaveURL(/\/avisos$/);
 
   await expect(page.getByRole("heading", { name: "Central de avisos" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Avisos" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("Orçamento em atenção")).toBeVisible();
   await page.getByRole("button", { name: "Marcar todos como lidos" }).click();
   await expect(page.getByText("Tudo lido por aqui")).toBeVisible();
   await page.getByRole("button", { name: "Não lidos" }).click();
   await expect(page.getByText("Nenhum aviso neste filtro")).toBeVisible();
+  await page.getByRole("link", { name: "Finanças" }).click();
+  await expect(page.locator("[data-slot='sidebar-notification-badge']")).toHaveCount(0);
+  await page.getByRole("link", { name: /Planos|Planejamento/ }).click();
+  await expect(page.locator("[data-slot='sidebar-notification-badge']")).toHaveCount(0);
 });
 
 test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) => {

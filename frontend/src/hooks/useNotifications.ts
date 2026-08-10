@@ -14,6 +14,11 @@ interface DadosAvisos { movs: Movimentacao[]; metas: Meta[]; recorrencias: Recor
 
 const eventoLeitura = "listaweb:avisos-lidos";
 const chaveLeitura = (usuarioId: number) => `avisos-lidos:${usuarioId}`;
+const lerLidos = (usuarioId?: number) => {
+  if (!usuarioId || typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(chaveLeitura(usuarioId)) || "[]") as string[]; }
+  catch { return []; }
+};
 
 async function carregarAvisos(usuarioId: number): Promise<DadosAvisos> {
   const hoje = new Date(); const mes = hoje.getMonth() + 1; const ano = hoje.getFullYear();
@@ -37,11 +42,11 @@ function calcularAvisos(dados: DadosAvisos): Omit<AvisoApp, "lido">[] {
 }
 
 export function useNotifications(usuarioId?: number, habilitado = true) {
-  const [lidos, setLidos] = useState<string[]>([]);
+  const [lidos, setLidos] = useState<string[]>(() => lerLidos(usuarioId));
   const query = useQuery<DadosAvisos>({ queryKey: ["avisos", usuarioId], queryFn: () => carregarAvisos(usuarioId!), enabled: Boolean(usuarioId && habilitado), staleTime: 60_000 });
   useEffect(() => {
     if (!usuarioId) return;
-    const sincronizar = () => { try { setLidos(JSON.parse(localStorage.getItem(chaveLeitura(usuarioId)) || "[]")); } catch { setLidos([]); } };
+    const sincronizar = () => setLidos(lerLidos(usuarioId));
     sincronizar(); window.addEventListener(eventoLeitura, sincronizar); return () => window.removeEventListener(eventoLeitura, sincronizar);
   }, [usuarioId]);
   const avisos = useMemo(() => calcularAvisos(query.data ?? { movs: [], metas: [], recorrencias: [], orcamentos: [], cartoes: [], faturas: [] }).map((aviso) => ({ ...aviso, lido: lidos.includes(aviso.id) })), [lidos, query.data]);

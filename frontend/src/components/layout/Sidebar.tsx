@@ -126,7 +126,7 @@ export default function Sidebar() {
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
             >
-              <span className="relative shrink-0"><Icon size={20} />{link.href === "/avisos" && naoLidos > 0 && <span className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{Math.min(9, naoLidos)}</span>}</span>
+              <span className="relative shrink-0"><Icon size={20} />{link.href === "/avisos" && naoLidos > 0 && <span data-slot="sidebar-notification-badge" aria-hidden="true" className="absolute -right-2 -top-2 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{Math.min(9, naoLidos)}</span>}</span>
               <span className="max-w-full truncate md:hidden">{link.mobileLabel}</span>
               <span className="hidden max-w-full truncate md:inline">{link.label}</span>
             </Link>
