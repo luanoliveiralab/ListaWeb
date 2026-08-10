@@ -60,6 +60,8 @@ export default function CreditCardsPanel({ cartoes, carregando, onAdicionar, onR
     try {
       await onAdicionar({ nome: nome.trim(), instituicao: instituicaoFinal, limite_disponivel: valor, dia_vencimento: dia });
       setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento("");
+    } catch {
+      // O componente pai exibe a mensagem adequada sem limpar o formulário.
     } finally {
       setSalvando(false);
     }

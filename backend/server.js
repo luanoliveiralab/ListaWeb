@@ -6,6 +6,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 const crypto = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 const { pool, verificarConexao } = require("./src/db");
 const { enviarEmailRecuperacao } = require("./src/email");
 const { autenticar } = require("./src/middleware/autenticar");
@@ -2209,9 +2211,22 @@ app.use(
 // START SERVER
 // =====================================================
 
-if (require.main === module) {
+async function iniciarServidor() {
+    const migracao = await fs.readFile(
+        path.join(__dirname, "migrations/001_initial.sql"),
+        "utf8"
+    );
+    await pool.query(migracao);
+
     app.listen(PORT, () => {
         console.log(`Backend rodando na porta ${PORT}`);
+    });
+}
+
+if (require.main === module) {
+    iniciarServidor().catch((err) => {
+        console.error("Erro ao preparar o banco de dados:", err);
+        process.exit(1);
     });
 }
 
