@@ -102,6 +102,14 @@ O projeto já inclui:
 
 Nunca envie arquivos `.env`, chaves SMTP, tokens ou credenciais para o repositório. Use apenas dados fictícios durante desenvolvimento e homologação.
 
+As regras completas estão na [política de segurança](SECURITY.md). O comando abaixo verifica se nomes de arquivos ou assinaturas comuns de segredos foram incluídos por engano:
+
+```bash
+node scripts/check-secrets.js
+```
+
+Essa verificação também é executada automaticamente pelo GitHub em pushes e pull requests.
+
 ## Executando localmente
 
 ### Pré-requisitos
