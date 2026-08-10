@@ -9,12 +9,14 @@ import { authService } from "@/services/auth.service";
 
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import PasswordInput from "@/components/auth/PasswordInput";
+import RegistrationTerms, { TERMS_VERSION } from "@/components/auth/RegistrationTerms";
 
 import { useToast } from "@/providers/ToastProvider";
 
 export default function CadastroPage() {
   const [loading, setLoading] = useState(false);
   const [emailEnviado, setEmailEnviado] = useState("");
+  const [termosAceitos, setTermosAceitos] = useState(false);
 
   const { mostrarAviso } = useToast();
 
@@ -52,11 +54,19 @@ export default function CadastroPage() {
       return;
     }
 
+    if (!termosAceitos) {
+      mostrarAviso("Leia e aceite os Termos de Uso e Privacidade.", "erro");
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await authService.cadastro({
         nome,
         email,
         senha,
+        aceitouTermos: true,
+        versaoTermos: TERMS_VERSION,
       });
 
       setEmailEnviado(data.email || email);
@@ -142,9 +152,11 @@ export default function CadastroPage() {
           className="mb-6"
         />
 
+        <RegistrationTerms accepted={termosAceitos} onAcceptedChange={setTermosAceitos} />
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !termosAceitos}
           className="button-primary h-11 w-full"
         >
           {loading ? "Criando..." : "Criar Conta"}

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, CheckCircle2, Gift, Layers3, Rocket, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Gift, Layers3, Rocket, ShieldCheck } from "lucide-react";
 import AboutHeroCarousel from "@/components/about/AboutHeroCarousel";
+import AboutBackButton from "@/components/about/AboutBackButton";
 
 const fases = [
   { titulo: "Fundação", texto: "Lista de compras, autenticação e uma experiência simples para organizar o dia a dia." },
@@ -22,7 +22,7 @@ const contatos = [
 export default function SobrePage() {
   return <><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw==" crossOrigin="anonymous" referrerPolicy="no-referrer" precedence="default" /><main className="min-h-screen bg-background text-foreground">
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <nav className="flex items-center justify-between"><Link href="/" className="button-secondary"><ArrowLeft size={17} /> Voltar</Link><div className="flex items-center gap-2"><Image src="/listaweb-logo.png" alt="" width={32} height={32} className="size-8 object-contain dark:hidden" /><Image src="/listaweb-logo-dark.png" alt="" width={32} height={32} className="hidden size-8 object-contain dark:block" /><strong>ListaWeb</strong></div></nav>
+      <nav className="flex items-center justify-between"><AboutBackButton /><div className="flex items-center gap-2"><Image src="/listaweb-logo.png" alt="" width={32} height={32} className="size-8 object-contain dark:hidden" /><Image src="/listaweb-logo-dark.png" alt="" width={32} height={32} className="hidden size-8 object-contain dark:block" /><strong>ListaWeb</strong></div></nav>
 
       <AboutHeroCarousel />
 

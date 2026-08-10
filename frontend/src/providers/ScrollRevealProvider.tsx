@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 const REVEAL_SELECTOR = ".surface, .surface-interactive, [data-scroll-reveal]";
+const VIEWPORT_ANIMATION_SELECTOR = ".transaction-row, .metric-enter, [data-viewport-animations]";
 
 export function ScrollRevealProvider() {
   useEffect(() => {
@@ -10,6 +11,7 @@ export function ScrollRevealProvider() {
     if (reducedMotion.matches || !("IntersectionObserver" in window)) return;
 
     const prepared = new WeakSet<Element>();
+    const animationPrepared = new WeakSet<Element>();
     const cleanupTimers = new Set<number>();
 
     function finishReveal(element: HTMLElement) {
@@ -43,6 +45,12 @@ export function ScrollRevealProvider() {
       { threshold: 0.12, rootMargin: "0px 0px -7% 0px" }
     );
 
+    const animationObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        entry.target.classList.toggle("viewport-animation-active", entry.isIntersecting);
+      });
+    }, { threshold: 0.01, rootMargin: "120px 0px" });
+
     function prepare(root: ParentNode = document) {
       const elements = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
 
@@ -53,6 +61,15 @@ export function ScrollRevealProvider() {
         element.classList.add("scroll-reveal-pending");
         element.style.setProperty("--scroll-reveal-delay", `${(index % 4) * 55}ms`);
         observer.observe(element);
+      });
+
+      const animationElements = Array.from(root.querySelectorAll<HTMLElement>(VIEWPORT_ANIMATION_SELECTOR));
+      if (root instanceof HTMLElement && root.matches(VIEWPORT_ANIMATION_SELECTOR)) animationElements.unshift(root);
+
+      animationElements.forEach((element) => {
+        if (animationPrepared.has(element)) return;
+        animationPrepared.add(element);
+        animationObserver.observe(element);
       });
     }
 
@@ -74,6 +91,7 @@ export function ScrollRevealProvider() {
     return () => {
       mutations.disconnect();
       observer.disconnect();
+      animationObserver.disconnect();
       cleanupTimers.forEach((timer) => window.clearTimeout(timer));
     };
   }, []);

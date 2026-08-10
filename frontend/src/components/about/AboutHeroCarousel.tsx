@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
+import { useViewportActivity } from "@/hooks/useViewportActivity";
 
 const mensagens = [
   {
@@ -21,16 +22,18 @@ const mensagens = [
 export default function AboutHeroCarousel() {
   const [indice, setIndice] = useState(0);
   const [ciclo, setCiclo] = useState(0);
+  const carouselRef = useRef<HTMLElement>(null);
+  const active = useViewportActivity(carouselRef);
 
   useEffect(() => {
     const movimentoReduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (movimentoReduzido) return;
+    if (movimentoReduzido || !active) return;
     const intervalo = window.setInterval(
       () => setIndice((atual) => (atual + 1) % mensagens.length),
       7000
     );
     return () => window.clearInterval(intervalo);
-  }, [ciclo]);
+  }, [active, ciclo]);
 
   function selecionarMensagem(posicao: number) {
     setIndice(posicao);
@@ -38,7 +41,7 @@ export default function AboutHeroCarousel() {
   }
 
   return (
-    <section data-scroll-reveal className="relative mt-8 overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-12 shadow-sm sm:px-12 sm:py-16">
+    <section ref={carouselRef} data-scroll-reveal data-viewport-animations className="relative mt-8 overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-12 shadow-sm sm:px-12 sm:py-16">
       <div className="absolute -right-20 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative max-w-4xl">
         <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">

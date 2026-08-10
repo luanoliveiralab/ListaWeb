@@ -338,6 +338,18 @@ button:disabled,
   }
 }
 
+.transaction-row,
+.metric-enter,
+[data-viewport-animations] {
+  animation-play-state: paused;
+}
+
+.transaction-row.viewport-animation-active,
+.metric-enter.viewport-animation-active,
+[data-viewport-animations].viewport-animation-active {
+  animation-play-state: running;
+}
+
 .scroll-reveal-pending {
   opacity: 0;
   transform: translateY(22px) scale(0.985);

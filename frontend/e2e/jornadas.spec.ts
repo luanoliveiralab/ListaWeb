@@ -8,7 +8,7 @@ test("exibe os acessos públicos da tela de login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "ListaWeb" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute("href", "/esqueci-senha");
   await expect(page.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/cadastro");
-  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/sobre");
+  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/sobre?origem=login");
 });
 
 test("permite mostrar e ocultar senhas no login e no cadastro", async ({ page }) => {
@@ -27,6 +27,24 @@ test("permite mostrar e ocultar senhas no login e no cadastro", async ({ page })
   await page.getByRole("button", { name: "Mostrar senha" }).first().click();
   await expect(senhaCadastro).toHaveAttribute("type", "text");
   await expect(confirmarSenha).toHaveAttribute("type", "password");
+});
+
+test("exige a leitura e o aceite dos termos antes do cadastro", async ({ page }) => {
+  await page.goto("/cadastro");
+  const criarConta = page.getByRole("button", { name: "Criar Conta" });
+  await expect(criarConta).toBeDisabled();
+
+  await page.getByRole("button", { name: "Ler Termos de Uso e Privacidade" }).click();
+  await expect(page.getByRole("heading", { name: "Termos de Uso e Privacidade" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Li e aceito" })).toBeDisabled();
+  await page.getByTestId("registration-terms-content").evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  await expect(page.getByRole("button", { name: "Li e aceito" })).toBeEnabled();
+  await page.getByRole("button", { name: "Li e aceito" }).click();
+  await expect(criarConta).toBeEnabled();
+
+  await page.getByRole("button", { name: "Ler novamente" }).click();
+  await page.getByRole("button", { name: "Não aceito" }).click();
+  await expect(criarConta).toBeDisabled();
 });
 
 test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page }) => {
@@ -172,6 +190,10 @@ test("mantém header e formulário fixos enquanto apenas categorias rolam", asyn
   await page.getByPlaceholder("Senha").fill("senha-segura-123");
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.goto("/configuracoes");
+  await page.getByRole("link", { name: "Conhecer o projeto" }).click();
+  await expect(page).toHaveURL(/\/sobre\?origem=configuracoes$/);
+  await page.getByRole("button", { name: "Voltar" }).click();
+  await expect(page).toHaveURL(/\/configuracoes$/);
   await page.getByRole("button", { name: "Gerenciar categorias" }).click();
 
   const modal = page.getByTestId("categorias-modal");

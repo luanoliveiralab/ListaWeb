@@ -9,6 +9,8 @@ interface CadastroDTO {
     nome: string;
     email: string;
     senha: string;
+    aceitouTermos: true;
+    versaoTermos: string;
 }
 
 export const authService = {

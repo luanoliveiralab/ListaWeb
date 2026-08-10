@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserRound } from "lucide-react";
 import Image from "next/image";
+import { useViewportActivity } from "@/hooks/useViewportActivity";
 
 interface WelcomeProps {
   nome: string;
@@ -18,6 +19,8 @@ const mensagens = [
 export default function Welcome({ nome, foto }: WelcomeProps) {
   const [indice, setIndice] = useState(0);
   const [ciclo, setCiclo] = useState(0);
+  const carouselRef = useRef<HTMLElement>(null);
+  const active = useViewportActivity(carouselRef);
   const hora = new Date().getHours();
 
   let saudacao = "Boa noite";
@@ -30,13 +33,13 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
 
   useEffect(() => {
     const movimentoReduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (movimentoReduzido) return;
+    if (movimentoReduzido || !active) return;
     const intervalo = window.setInterval(
       () => setIndice((atual) => (atual + 1) % mensagens.length),
       7000
     );
     return () => window.clearInterval(intervalo);
-  }, [ciclo]);
+  }, [active, ciclo]);
 
   function selecionarMensagem(posicao: number) {
     setIndice(posicao);
@@ -44,7 +47,7 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
   }
 
   return (
-    <section className="surface relative mb-6 overflow-hidden bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-8">
+    <section ref={carouselRef} data-viewport-animations className="surface relative mb-6 overflow-hidden bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-8">
       <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative flex items-center justify-between gap-6">
         <div>

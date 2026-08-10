@@ -91,6 +91,8 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         nome,
         email,
         senha,
+        aceitouTermos,
+        versaoTermos,
     } = req.body;
 
     if (
@@ -104,6 +106,12 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
     ) {
         return res.status(400).json({
             mensagem: "Preencha todos os campos.",
+        });
+    }
+
+    if (aceitouTermos !== true || versaoTermos !== "2026-08-10") {
+        return res.status(400).json({
+            mensagem: "É necessário aceitar os Termos de Uso e Privacidade.",
         });
     }
 
@@ -146,13 +154,14 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         );
 
         const result = await pool.query(
-            `INSERT INTO usuarios (nome, email, senha, email_verificado)
-             VALUES ($1, $2, $3, FALSE)
+            `INSERT INTO usuarios (nome, email, senha, email_verificado, termos_aceitos_em, termos_versao)
+             VALUES ($1, $2, $3, FALSE, NOW(), $4)
              RETURNING id, nome, email, foto`,
             [
                 nomeLimpo,
                 emailLimpo,
                 senhaHash,
+                versaoTermos,
             ]
         );
 
