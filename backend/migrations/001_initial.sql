@@ -112,6 +112,21 @@ CREATE TABLE IF NOT EXISTS cartoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS faturas_cartao (
+    id SERIAL PRIMARY KEY,
+    cartao_id INTEGER NOT NULL REFERENCES cartoes(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    mes SMALLINT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+    ano INTEGER NOT NULL CHECK (ano BETWEEN 2000 AND 2200),
+    status VARCHAR(10) NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta', 'fechada', 'paga')),
+    fechada_em TIMESTAMPTZ,
+    paga_em TIMESTAMPTZ,
+    pagamento_movimentacao_id INTEGER REFERENCES movimentacoes(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (cartao_id, ano, mes)
+);
+
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS forma_pagamento
     VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS cartao_id
@@ -129,6 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario ON recuperacoes_senha(
 CREATE INDEX IF NOT EXISTS idx_verificacoes_email_usuario ON verificacoes_email(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_meta_movimentacoes_meta ON meta_movimentacoes(meta_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_faturas_cartao_periodo ON faturas_cartao(cartao_id, ano DESC, mes DESC);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao_id, data DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

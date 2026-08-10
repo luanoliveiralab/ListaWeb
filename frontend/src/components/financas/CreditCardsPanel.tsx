@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, CreditCard, Plus, Trash2, Wifi } from "lucide-react";
+import { Building2, CreditCard, Plus, ReceiptText, Trash2, Wifi, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import type { Cartao } from "@/types/Cartao";
 import type { Movimentacao } from "@/types/Movimentacao";
+import type { FaturaCartao } from "@/types/Cartao";
+import { cartoesService } from "@/services/cartoes.service";
 
 interface Props {
   cartoes: Cartao[];
@@ -50,6 +53,18 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   const [salvando, setSalvando] = useState(false);
   const [removendo, setRemovendo] = useState<number | null>(null);
   const [formularioAberto, setFormularioAberto] = useState(false);
+  const [cartaoFaturas, setCartaoFaturas] = useState<Cartao | null>(null);
+  const [faturaSelecionada, setFaturaSelecionada] = useState<FaturaCartao | null>(null);
+  const faturasQuery = useQuery({
+    queryKey: ["faturas", cartaoFaturas?.id],
+    queryFn: () => cartoesService.listarFaturas(cartaoFaturas!.id),
+    enabled: Boolean(cartaoFaturas?.id),
+  });
+  const detalheQuery = useQuery({
+    queryKey: ["fatura", cartaoFaturas?.id, faturaSelecionada?.ano, faturaSelecionada?.mes],
+    queryFn: () => cartoesService.detalharFatura(cartaoFaturas!.id, faturaSelecionada!.ano, faturaSelecionada!.mes),
+    enabled: Boolean(cartaoFaturas?.id && faturaSelecionada),
+  });
 
   const instituicaoFinal = instituicao === "Outra instituição" ? outraInstituicao.trim() : instituicao;
 
@@ -164,7 +179,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
                 <div className="relative flex h-full flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-xs text-white/70">{cartao.nome}</p><p className="mt-1 max-w-40 truncate text-lg font-bold">{estilo.sigla}</p></div>
-                    <button type="button" onClick={() => remover(cartao.id)} disabled={removendo === cartao.id} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Excluir ${cartao.nome}`}><Trash2 size={16} /></button>
+                    <div className="flex gap-1"><button type="button" onClick={() => { setCartaoFaturas(cartao); setFaturaSelecionada(null); }} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Ver faturas de ${cartao.nome}`}><ReceiptText size={16} /></button><button type="button" onClick={() => remover(cartao.id)} disabled={removendo === cartao.id} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Excluir ${cartao.nome}`}><Trash2 size={16} /></button></div>
                   </div>
                   <div className="flex items-center gap-3"><span className="h-8 w-10 rounded-md bg-gradient-to-br from-yellow-200 to-amber-400 shadow-inner" /><Wifi className="rotate-90 text-white/80" size={20} /></div>
                   <div>
@@ -178,6 +193,31 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
               </article>
             );
           })}
+        </div>
+      )}
+
+      {cartaoFaturas && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartaoFaturas(null); }}>
+          <div className="modal-panel max-w-3xl">
+            <header className="flex items-start justify-between gap-4">
+              <div><p className="text-sm font-medium text-primary">Histórico do cartão</p><h2 className="mt-1 text-xl font-semibold">Faturas de {cartaoFaturas.nome}</h2><p className="mt-1 text-sm text-muted-foreground">{cartaoFaturas.instituicao} · vence no dia {cartaoFaturas.dia_vencimento}</p></div>
+              <button type="button" className="icon-button" onClick={() => setCartaoFaturas(null)} aria-label="Fechar histórico de faturas"><X size={18} /></button>
+            </header>
+
+            <div className="mt-6 grid gap-5 md:grid-cols-[minmax(13rem,.75fr)_minmax(0,1.25fr)]">
+              <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+                {faturasQuery.isPending && <p className="p-4 text-sm text-muted-foreground">Carregando faturas...</p>}
+                {faturasQuery.data?.map((fatura) => {
+                  const ativa = faturaSelecionada?.ano === fatura.ano && faturaSelecionada?.mes === fatura.mes;
+                  return <button type="button" key={`${fatura.ano}-${fatura.mes}`} onClick={() => setFaturaSelecionada(fatura)} className={`w-full rounded-xl border p-3 text-left transition ${ativa ? "border-primary bg-primary/5" : "border-border hover:bg-muted/60"}`}><div className="flex items-center justify-between gap-2"><strong className="capitalize">{new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(fatura.ano, fatura.mes - 1, 1))}</strong><span className={`status-pill ${fatura.status === "paga" ? "active" : fatura.status === "fechada" ? "paused" : ""}`}>{fatura.status}</span></div><p className="mt-2 text-lg font-semibold tabular-nums">{moeda.format(Number(fatura.total))}</p><p className="mt-1 text-xs text-muted-foreground">{fatura.quantidade} {fatura.quantidade === 1 ? "compra" : "compras"}</p></button>;
+                })}
+              </div>
+
+              <div className="min-h-64 rounded-2xl border border-border bg-muted/20 p-4">
+                {!faturaSelecionada ? <div className="flex h-full min-h-56 items-center justify-center text-center text-sm text-muted-foreground">Selecione uma fatura para visualizar as compras.</div> : detalheQuery.isPending ? <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">Carregando compras...</div> : <><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-muted-foreground">Total da fatura</p><strong className="text-xl tabular-nums">{moeda.format(Number(faturaSelecionada.total))}</strong></div><span className="text-xs text-muted-foreground">{faturaSelecionada.quantidade} lançamentos</span></div><div className="max-h-72 divide-y divide-border overflow-y-auto">{detalheQuery.data?.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.descricao}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.categoria} · {new Date(`${item.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</p></div><strong className="shrink-0 text-sm tabular-nums">{moeda.format(Number(item.valor))}</strong></div>)}{!detalheQuery.data?.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</p>}</div></>}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </section>

@@ -2267,6 +2267,76 @@ app.post("/cartoes", autenticar, async (req, res) => {
     }
 });
 
+app.get("/cartoes/:id/faturas", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ mensagem: "ID do cartão inválido." });
+    }
+
+    try {
+        const cartao = await pool.query(
+            "SELECT id, dia_vencimento FROM cartoes WHERE id = $1 AND usuario_id = $2",
+            [id, req.usuarioId]
+        );
+        if (!cartao.rowCount) return res.status(404).json({ mensagem: "Cartão não encontrado." });
+
+        const result = await pool.query(
+            `WITH periodos AS (
+                SELECT DISTINCT EXTRACT(YEAR FROM data)::int AS ano, EXTRACT(MONTH FROM data)::int AS mes
+                FROM movimentacoes
+                WHERE usuario_id = $1 AND cartao_id = $2 AND tipo = 'despesa' AND forma_pagamento = 'credito'
+                UNION
+                SELECT EXTRACT(YEAR FROM CURRENT_DATE)::int, EXTRACT(MONTH FROM CURRENT_DATE)::int
+             )
+             SELECT p.ano, p.mes, COALESCE(f.status, 'aberta') AS status,
+                    COALESCE(SUM(m.valor), 0)::numeric(12,2) AS total,
+                    COUNT(m.id)::int AS quantidade,
+                    f.fechada_em, f.paga_em,
+                    make_date(p.ano, p.mes, LEAST($3, 28)) + INTERVAL '1 month' AS vencimento
+             FROM periodos p
+             LEFT JOIN faturas_cartao f ON f.cartao_id = $2 AND f.ano = p.ano AND f.mes = p.mes
+             LEFT JOIN movimentacoes m ON m.usuario_id = $1 AND m.cartao_id = $2
+                AND m.tipo = 'despesa' AND m.forma_pagamento = 'credito'
+                AND EXTRACT(YEAR FROM m.data) = p.ano AND EXTRACT(MONTH FROM m.data) = p.mes
+             GROUP BY p.ano, p.mes, f.status, f.fechada_em, f.paga_em
+             ORDER BY p.ano DESC, p.mes DESC
+             LIMIT 24`,
+            [req.usuarioId, id, cartao.rows[0].dia_vencimento]
+        );
+        return res.json(result.rows);
+    } catch (err) {
+        console.error("Erro ao buscar faturas:", err);
+        return res.status(500).json({ mensagem: "Erro ao buscar faturas do cartão." });
+    }
+});
+
+app.get("/cartoes/:id/faturas/:ano/:mes", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    const ano = Number(req.params.ano);
+    const mes = Number(req.params.mes);
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(ano) || ano < 2000 || ano > 2200 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ mensagem: "Período da fatura inválido." });
+    }
+
+    try {
+        const cartao = await pool.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2", [id, req.usuarioId]);
+        if (!cartao.rowCount) return res.status(404).json({ mensagem: "Cartão não encontrado." });
+        const result = await pool.query(
+            `SELECT m.id, m.descricao, m.valor, m.categoria, m.data, m.created_at
+             FROM movimentacoes m
+             WHERE m.usuario_id = $1 AND m.cartao_id = $2 AND m.tipo = 'despesa'
+               AND m.forma_pagamento = 'credito'
+               AND EXTRACT(YEAR FROM m.data) = $3 AND EXTRACT(MONTH FROM m.data) = $4
+             ORDER BY m.data DESC, m.id DESC`,
+            [req.usuarioId, id, ano, mes]
+        );
+        return res.json(result.rows);
+    } catch (err) {
+        console.error("Erro ao detalhar fatura:", err);
+        return res.status(500).json({ mensagem: "Erro ao detalhar fatura." });
+    }
+});
+
 app.delete("/cartoes/:id", autenticar, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
