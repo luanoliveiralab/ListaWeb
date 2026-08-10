@@ -17,7 +17,10 @@ test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page 
   await expect(page.getByRole("heading", { name: "Etapas do projeto" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Foto de Luan Oliveira" })).toBeVisible();
   await expect(page.getByRole("link", { name: "LinkedIn" })).toHaveAttribute("href", "https://www.linkedin.com/in/luanoliveira-ld");
+  await expect(page.getByRole("link", { name: "YouTube" })).toHaveAttribute("href", "https://www.youtube.com/@dev_lso");
+  await page.waitForTimeout(4000);
   await page.getByRole("button", { name: "Mostrar mensagem 2" }).click();
+  await page.waitForTimeout(4000);
   await expect(page.getByRole("heading", { name: /Cartões e faturas/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "É 100% gratuito?" })).toBeVisible();
 });
@@ -48,7 +51,9 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await expect(page.getByText("Saldo em conta")).toBeVisible();
   await expect(page.getByText("R$ 4.750,00", { exact: true })).toBeVisible();
   await expect(page.getByText("Crédito disponível")).toBeVisible();
+  await page.waitForTimeout(4000);
   await page.getByRole("button", { name: "Mostrar mensagem 2" }).click();
+  await page.waitForTimeout(4000);
   await expect(page.getByText(/Acompanhe saldo, receitas, despesas/)).toBeVisible();
   await expect(page.getByRole("link", { name: /Finanças/ })).toBeVisible();
 });

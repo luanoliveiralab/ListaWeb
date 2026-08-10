@@ -20,6 +20,7 @@ const mensagens = [
 
 export default function AboutHeroCarousel() {
   const [indice, setIndice] = useState(0);
+  const [ciclo, setCiclo] = useState(0);
 
   useEffect(() => {
     const movimentoReduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -29,7 +30,12 @@ export default function AboutHeroCarousel() {
       7000
     );
     return () => window.clearInterval(intervalo);
-  }, []);
+  }, [ciclo]);
+
+  function selecionarMensagem(posicao: number) {
+    setIndice(posicao);
+    setCiclo((atual) => atual + 1);
+  }
 
   return (
     <section className="relative mt-8 overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-12 shadow-sm sm:px-12 sm:py-16">
@@ -68,7 +74,7 @@ export default function AboutHeroCarousel() {
               type="button"
               aria-label={`Mostrar mensagem ${posicao + 1}`}
               aria-current={posicao === indice ? "true" : undefined}
-              onClick={() => setIndice(posicao)}
+              onClick={() => selecionarMensagem(posicao)}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 posicao === indice ? "w-9 bg-primary" : "w-4 bg-primary/25 hover:bg-primary/45"
               }`}

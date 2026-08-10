@@ -14,6 +14,7 @@ const fases = [
 const contatos = [
   { nome: "GitHub", href: process.env.NEXT_PUBLIC_ABOUT_GITHUB ?? "https://github.com/luanoliveiralab/ListaWeb", icone: "fa-brands fa-github" },
   { nome: "LinkedIn", href: process.env.NEXT_PUBLIC_ABOUT_LINKEDIN ?? "https://www.linkedin.com/in/luanoliveira-ld", icone: "fa-brands fa-linkedin" },
+  { nome: "YouTube", href: process.env.NEXT_PUBLIC_ABOUT_YOUTUBE ?? "https://www.youtube.com/@dev_lso", icone: "fa-brands fa-youtube" },
   { nome: "Portfólio", href: process.env.NEXT_PUBLIC_ABOUT_PORTFOLIO, icone: "fa-solid fa-globe" },
   { nome: "Contato", href: process.env.NEXT_PUBLIC_ABOUT_EMAIL ? `mailto:${process.env.NEXT_PUBLIC_ABOUT_EMAIL}` : undefined, icone: "fa-solid fa-envelope" },
 ].filter((item): item is { nome: string; href: string; icone: string } => Boolean(item.href));

@@ -17,6 +17,7 @@ const mensagens = [
 
 export default function Welcome({ nome, foto }: WelcomeProps) {
   const [indice, setIndice] = useState(0);
+  const [ciclo, setCiclo] = useState(0);
   const hora = new Date().getHours();
 
   let saudacao = "Boa noite";
@@ -35,7 +36,12 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
       7000
     );
     return () => window.clearInterval(intervalo);
-  }, []);
+  }, [ciclo]);
+
+  function selecionarMensagem(posicao: number) {
+    setIndice(posicao);
+    setCiclo((atual) => atual + 1);
+  }
 
   return (
     <section className="surface relative mb-6 overflow-hidden bg-gradient-to-br from-primary/15 via-card to-card p-6 sm:p-8">
@@ -74,7 +80,7 @@ export default function Welcome({ nome, foto }: WelcomeProps) {
                 type="button"
                 aria-label={`Mostrar mensagem ${posicao + 1}`}
                 aria-current={posicao === indice ? "true" : undefined}
-                onClick={() => setIndice(posicao)}
+                onClick={() => selecionarMensagem(posicao)}
                 className={`h-1.5 rounded-full transition-all duration-500 ${
                   posicao === indice ? "w-8 bg-primary" : "w-3 bg-primary/25 hover:bg-primary/45"
                 }`}
