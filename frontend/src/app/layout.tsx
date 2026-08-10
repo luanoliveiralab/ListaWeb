@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { PeriodProvider } from "@/context/PeriodContext";
 
 import { ToastProvider } from "@/providers/ToastProvider";
+import { QueryProvider } from "@/providers/QueryProvider";
 
 export const metadata: Metadata = {
   title: "ListaWeb",
@@ -30,11 +31,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <ToastProvider>
-            <PeriodProvider>
-              {children}
-            </PeriodProvider>
-          </ToastProvider>
+          <QueryProvider>
+            <ToastProvider>
+              <PeriodProvider>
+                {children}
+              </PeriodProvider>
+            </ToastProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

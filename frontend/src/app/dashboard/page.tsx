@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import AppLayout from "@/components/layout/AppLayout";
 import Welcome from "@/components/layout/Welcome";
 import DashboardCards from "@/components/dashboard/DashboardCards";
 
 import { useUsuario } from "@/hooks/useUsuario";
-import type { ItemLista } from "@/types/ItemLista";
-import { dashboardService, type DashboardData } from "@/services/dashboard.service";
-
-import type { Movimentacao } from "@/types/Movimentacao";
-import type { Cartao } from "@/types/Cartao";
+import { dashboardService } from "@/services/dashboard.service";
 
 import RecentMovimentacoes from "@/components/dashboard/RecentMovimentacoes";
 
@@ -25,11 +21,6 @@ import { usePeriod } from "@/context/PeriodContext";
 export default function Dashboard() {
   const { usuario } = useUsuario();
 
-  const [lista, setLista] = useState<ItemLista[]>([]);
-  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
-  const [cartoes, setCartoes] = useState<Cartao[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const {
     mes,
     ano,
@@ -37,42 +28,17 @@ export default function Dashboard() {
     setAno,
   } = usePeriod();
 
-  useEffect(() => {
-    if (!usuario?.id) return;
+  const { data, isPending } = useQuery({
+    queryKey: ["dashboard", usuario?.id, ano, mes],
+    queryFn: () => dashboardService.buscar(mes, ano),
+    enabled: Boolean(usuario?.id),
+    placeholderData: (anterior) => anterior,
+  });
+  const lista = data?.lista ?? [];
+  const movimentacoes = data?.movimentacoes ?? [];
+  const cartoes = data?.cartoes ?? [];
 
-    async function load() {
-      const cacheKey = `dashboard:${usuario!.id}:${ano}-${mes}`;
-      const cache = sessionStorage.getItem(cacheKey);
-
-      if (cache) {
-        try {
-          const dados: DashboardData = JSON.parse(cache);
-          setLista(dados.lista);
-          setMovimentacoes(dados.movimentacoes);
-          setCartoes(dados.cartoes ?? []);
-          setLoading(false);
-        } catch {
-          sessionStorage.removeItem(cacheKey);
-        }
-      }
-
-      try {
-        const dados = await dashboardService.buscar(mes, ano);
-        setLista(dados.lista);
-        setMovimentacoes(dados.movimentacoes);
-        setCartoes(dados.cartoes ?? []);
-        sessionStorage.setItem(cacheKey, JSON.stringify(dados));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, [ano, mes, usuario]);
-
-  if (!usuario || loading) {
+  if (!usuario || (isPending && !data)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         Carregando...
