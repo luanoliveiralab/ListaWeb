@@ -31,9 +31,10 @@ async function prepararApi(page: Page) {
     if (/^\/cartoes\/1\/faturas\/\d{4}\/\d{1,2}$/.test(pathname)) return responderJson(route, [{ id: 2, descricao: "Mercado", valor: 250, categoria: "Mercado", data: "2026-08-10", created_at: new Date().toISOString() }]);
     if (pathname === "/financas") return responderJson(route, []);
     if (pathname === "/orcamentos/42") return responderJson(route, [{ id: 1, categoria: "Mercado", valor: 800, mes: 8, ano: 2026 }]);
-    if (pathname === "/recorrencias/gerar") return responderJson(route, { geradas: 0, movimentacoes: [] });
+    if (pathname === "/recorrencias/gerar") return responderJson(route, { geradas: 0, movimentacoes: [{ id: 2, usuario_id: 42, tipo: "despesa", descricao: "Mercado", valor: 250, categoria: "Mercado", data: "2026-08-10", created_at: new Date().toISOString(), forma_pagamento: "saldo" }] });
     if (pathname === "/recorrencias") return responderJson(route, [{ id: 1, tipo: "despesa", descricao: "Aluguel", valor: 1200, categoria: "Moradia", dia: 5, ativa: true }]);
     if (pathname === "/metas") return responderJson(route, [{ id: 1, nome: "Reserva", valor_alvo: 10000, valor_atual: 1500, prazo: null, concluida: false }]);
+    if (pathname === "/lista/42") return responderJson(route, [{ id: 1, nome: "Arroz", quantidade: 2, categoria: "Mercado", valor: 20, comprado: false, movimentacao_id: null, created_at: new Date().toISOString() }]);
     if (pathname === "/categorias") return responderJson(route, [
       { id: 1, nome: "Mercado", tipo: "despesa", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       { id: 2, nome: "Salário", tipo: "receita", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -120,6 +121,10 @@ test("solicita confirmação visual nas exclusões financeiras e de planejamento
   await page.getByRole("button", { name: "Entrar" }).click();
 
   await page.goto("/financas");
+  await page.getByRole("button", { name: "Excluir Mercado" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir esta movimentação?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sim, excluir movimentação" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
   await page.getByRole("button", { name: "Excluir Principal" }).click();
   await expect(page.getByRole("heading", { name: "Excluir este cartão?" })).toBeVisible();
   await page.getByRole("button", { name: "Cancelar" }).click();
@@ -143,6 +148,12 @@ test("solicita confirmação visual nas exclusões financeiras e de planejamento
   await page.getByRole("button", { name: "Cancelar" }).click();
   await page.getByRole("button", { name: "Excluir meta Reserva" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta meta?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+
+  await page.goto("/lista");
+  await page.getByRole("button", { name: "Excluir Arroz" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir este item?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sim, excluir item" })).toBeVisible();
 });
 
 test("confirma remoção da foto e avisa quando os dados pessoais não mudam", async ({ page }) => {

@@ -27,6 +27,7 @@ import { planejamentoService } from "@/services/planejamento.service";
 import CreditCardsPanel from "@/components/financas/CreditCardsPanel";
 import { cartoesService } from "@/services/cartoes.service";
 import type { Cartao } from "@/types/Cartao";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 export default function FinancasPage() {
     const { usuario } = useUsuario();
@@ -42,7 +43,7 @@ export default function FinancasPage() {
     const [movimentacaoExcluir, setMovimentacaoExcluir] =
         useState<Movimentacao | null>(null);
 
-    const [modalExcluir, setModalExcluir] = useState(false);
+    const [excluindoMovimentacao, setExcluindoMovimentacao] = useState(false);
 
     const [tipo, setTipo] = useState<"receita" | "despesa">("receita");
     const [descricao, setDescricao] = useState("");
@@ -210,7 +211,13 @@ export default function FinancasPage() {
 
     function abrirModalExcluir(movimentacao: Movimentacao) {
         setMovimentacaoExcluir(movimentacao);
-        setModalExcluir(true);
+    }
+
+    async function confirmarExclusaoMovimentacao() {
+        if (!movimentacaoExcluir) return;
+        setExcluindoMovimentacao(true);
+        try { await excluirMovimentacao(movimentacaoExcluir.id); setMovimentacaoExcluir(null); }
+        finally { setExcluindoMovimentacao(false); }
     }
 
     async function excluirMovimentacao(id: number) {
@@ -399,45 +406,7 @@ export default function FinancasPage() {
                 }}
             />
 
-            {modalExcluir && movimentacaoExcluir && (
-                <div className="modal-backdrop">
-                    <div className="modal-panel max-w-md">
-
-                        <h2 className="text-xl font-bold">
-                            Excluir movimentação?
-                        </h2>
-
-                        <p className="mt-2 text-muted-foreground">
-                            Tem certeza que deseja excluir “{movimentacaoExcluir.descricao}”?
-                        </p>
-
-                        <div className="modal-actions">
-
-                            <button
-                                onClick={() => {
-                                    setModalExcluir(false);
-                                    setMovimentacaoExcluir(null);
-                                }}
-                                className="button-secondary"
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                onClick={async () => {
-                                    await excluirMovimentacao(movimentacaoExcluir.id);
-                                    setModalExcluir(false);
-                                    setMovimentacaoExcluir(null);
-                                }}
-                                className="button-danger"
-                            >
-                                Excluir
-                            </button>
-
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmationDialog aberto={Boolean(movimentacaoExcluir)} titulo="Excluir esta movimentação?" descricao={<>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> será removida e deixará de participar do saldo e dos relatórios.</>} confirmar="Sim, excluir movimentação" processando={excluindoMovimentacao} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoMovimentacao} onAlterar={(aberto) => { if (!aberto) setMovimentacaoExcluir(null); }} />
 
             <EditMovimentacaoModal
                 key={movimentacaoEditando?.id ?? "fechado"}

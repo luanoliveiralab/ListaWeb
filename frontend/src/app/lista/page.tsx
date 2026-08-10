@@ -15,6 +15,7 @@ import type { ItemLista } from "@/types/ItemLista";
 
 import EditItemModal from "@/components/lista/EditItemModal";
 import { Search } from "lucide-react";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 export default function ListaPage() {
   const { usuario } = useUsuario();
@@ -128,11 +129,17 @@ export default function ListaPage() {
   const [itemExcluir, setItemExcluir] =
     useState<ItemLista | null>(null);
 
-  const [modalExcluir, setModalExcluir] = useState(false);
+  const [excluindoItem, setExcluindoItem] = useState(false);
 
   function abrirModalExcluir(item: ItemLista) {
     setItemExcluir(item);
-    setModalExcluir(true);
+  }
+
+  async function confirmarExclusaoItem() {
+    if (!itemExcluir) return;
+    setExcluindoItem(true);
+    try { await deletarItem(itemExcluir.id); setItemExcluir(null); }
+    finally { setExcluindoItem(false); }
   }
 
   // =========================
@@ -322,45 +329,7 @@ export default function ListaPage() {
         onEdit={editarItem}
       />
 
-      {modalExcluir && itemExcluir && (
-        <div className="modal-backdrop">
-          <div className="modal-panel max-w-md">
-            <h2 className="text-xl font-bold">
-              Excluir item?
-            </h2>
-
-            <p className="mt-2 text-muted-foreground">
-              Tem certeza que deseja excluir “{itemExcluir.nome}”?
-            </p>
-
-            <div className="modal-actions">
-              <button
-                onClick={() => {
-                  setModalExcluir(false);
-                  setItemExcluir(null);
-                }}
-                className="button-secondary"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={async () => {
-                  await deletarItem(
-                    itemExcluir.id
-                  );
-
-                  setModalExcluir(false);
-                  setItemExcluir(null);
-                }}
-                className="button-danger"
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationDialog aberto={Boolean(itemExcluir)} titulo="Excluir este item?" descricao={<>O item <strong>{itemExcluir?.nome}</strong> será removido da sua lista. Se ele gerou uma movimentação, o lançamento financeiro também será removido.</>} confirmar="Sim, excluir item" processando={excluindoItem} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoItem} onAlterar={(aberto) => { if (!aberto) setItemExcluir(null); }} />
 
       <EditItemModal
         key={itemEditando?.id ?? "fechado"}
