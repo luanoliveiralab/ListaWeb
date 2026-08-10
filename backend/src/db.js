@@ -1,9 +1,11 @@
 const { Pool } = require("pg");
 
+const verificarCertificado = process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false";
+
 const pool = new Pool(process.env.DATABASE_URL
     ? {
         connectionString: process.env.DATABASE_URL,
-        ssl: process.env.DB_SSL === "false" ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === "false" ? false : { rejectUnauthorized: verificarCertificado },
     }
     : {
         host: process.env.DB_HOST,
@@ -11,7 +13,7 @@ const pool = new Pool(process.env.DATABASE_URL
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
         port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: verificarCertificado } : false,
     });
 
 async function verificarConexao() {

@@ -174,9 +174,27 @@ router.post("/:id/faturas/:ano/:mes/pagar", asyncHandler(async (req, res) => {
 
 router.delete("/:id", asyncHandler(async (req, res) => {
     const id = idPositivo(req.params.id, "ID do cartão");
-    const result = await pool.query("DELETE FROM cartoes WHERE id = $1 AND usuario_id = $2 RETURNING id", [id, req.usuarioId]);
-    if (!result.rowCount) return res.status(404).json({ mensagem: "Cartão não encontrado." });
-    return res.json({ mensagem: "Cartão removido." });
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [id, req.usuarioId]);
+        if (!cartao.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ mensagem: "Cartão não encontrado." }); }
+        const uso = await client.query(
+            `SELECT EXISTS (SELECT 1 FROM movimentacoes WHERE cartao_id = $1 AND usuario_id = $2)
+                 OR EXISTS (SELECT 1 FROM faturas_cartao WHERE cartao_id = $1 AND usuario_id = $2) AS em_uso`,
+            [id, req.usuarioId]
+        );
+        if (uso.rows[0]?.em_uso) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ mensagem: "Este cartão possui movimentações ou faturas e não pode ser excluído. Preserve-o para manter o histórico." });
+        }
+        await client.query("DELETE FROM cartoes WHERE id = $1 AND usuario_id = $2", [id, req.usuarioId]);
+        await client.query("COMMIT");
+        return res.json({ mensagem: "Cartão removido." });
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+    } finally { client.release(); }
 }));
 
 module.exports = router;

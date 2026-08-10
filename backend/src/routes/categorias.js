@@ -2,6 +2,7 @@ const express = require("express");
 const { pool } = require("../db");
 const { autenticar } = require("../middleware/autenticar");
 const { asyncHandler, idPositivo, HttpError } = require("../http");
+const { booleanoOpcional } = require("../validation");
 
 const router = express.Router();
 router.use(autenticar);
@@ -17,9 +18,9 @@ function validar(body) {
     if (!nome || nome.length > 80 || !["receita", "despesa"].includes(tipo)) {
         throw new HttpError(400, "Dados da categoria inválidos.", "CATEGORIA_INVALIDA");
     }
-    const aplica_lista = body?.aplica_lista !== false;
-    const aplica_financas = body?.aplica_financas !== false;
-    const aplica_planejamento = body?.aplica_planejamento !== false;
+    const aplica_lista = booleanoOpcional(body, "aplica_lista");
+    const aplica_financas = booleanoOpcional(body, "aplica_financas");
+    const aplica_planejamento = booleanoOpcional(body, "aplica_planejamento");
     if (![aplica_lista, aplica_financas, aplica_planejamento].some(Boolean)) {
         throw new HttpError(400, "Escolha ao menos uma página para a categoria.", "CATEGORIA_SEM_PAGINA");
     }

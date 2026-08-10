@@ -10,3 +10,10 @@ test("categoria aceita uma ou mais páginas e mantém compatibilidade", () => {
 test("categoria exige ao menos uma página", () => {
     assert.throws(() => validarCategoria({ nome: "Oculta", tipo: "despesa", aplica_lista: false, aplica_financas: false, aplica_planejamento: false }), /ao menos uma página/i);
 });
+
+test("categoria rejeita flags de página que não sejam booleanas", () => {
+    assert.throws(
+        () => validarCategoria({ nome: "Pets", tipo: "despesa", aplica_lista: "false" }),
+        /verdadeiro ou falso/
+    );
+});

@@ -65,35 +65,26 @@ export default function ProfileCard({
             return;
         }
 
-        if (!arquivo.type.startsWith("image/")) {
+        if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(arquivo.type)) {
             mostrarAviso(
-                "Selecione apenas arquivos de imagem.",
+                "Selecione uma imagem JPG, PNG, WebP ou GIF.",
                 "erro"
             );
             return;
         }
 
         try {
-            const reader = new FileReader();
-
-            reader.onloadend = async () => {
-                const foto = reader.result;
-
-                if (typeof foto !== "string") return;
-
-                const usuarioAtualizado = await api.put(
-                    `/usuarios/${id}/foto`,
-                    { foto }
-                );
-
-                setUsuario(usuarioAtualizado);
-
-                mostrarAviso(
-                    "Foto atualizada com sucesso!"
-                );
-            };
-
-            reader.readAsDataURL(arquivo);
+            const foto = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => typeof reader.result === "string"
+                    ? resolve(reader.result)
+                    : reject(new Error("Não foi possível ler a imagem."));
+                reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+                reader.readAsDataURL(arquivo);
+            });
+            const usuarioAtualizado = await api.put(`/usuarios/${id}/foto`, { foto });
+            setUsuario(usuarioAtualizado);
+            mostrarAviso("Foto atualizada com sucesso!");
         } catch (err) {
             console.error(
                 "Erro ao atualizar foto:",
@@ -101,9 +92,11 @@ export default function ProfileCard({
             );
 
             mostrarAviso(
-                "Erro ao atualizar foto.",
+                err instanceof Error ? err.message : "Erro ao atualizar foto.",
                 "erro"
             );
+        } finally {
+            e.target.value = "";
         }
     }
 
@@ -230,7 +223,7 @@ export default function ProfileCard({
                 <input
                     ref={inputFotoRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     className="hidden"
                     onChange={selecionarFoto}
                 />

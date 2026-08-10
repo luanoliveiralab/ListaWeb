@@ -17,6 +17,7 @@ const metasRouter = require("./src/routes/metas");
 const cartoesRouter = require("./src/routes/cartoes");
 const categoriasRouter = require("./src/routes/categorias");
 const { criarContextoRequisicao, rotaNaoEncontrada, tratarErro } = require("./src/http");
+const { frontendUrlPrincipal, validarFotoDataUrl } = require("./src/validation");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -28,8 +29,8 @@ app.disable("x-powered-by");
 
 const PORT = process.env.PORT || 3001;
 
-if (!process.env.JWT_SECRET) {
-    console.error("? JWT_SECRET não foi definido no arquivo .env");
+if (!process.env.JWT_SECRET || (process.env.NODE_ENV === "production" && process.env.JWT_SECRET.length < 32)) {
+    console.error("JWT_SECRET deve estar definido e ter ao menos 32 caracteres em produção.");
     process.exit(1);
 }
 
@@ -95,6 +96,7 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
     if (
         typeof nome !== "string" ||
         !nome.trim() ||
+        nome.trim().length > 120 ||
         typeof email !== "string" ||
         !email.trim() ||
         typeof senha !== "string" ||
@@ -164,7 +166,7 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
              VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
             [usuario.id, tokenHash]
         );
-        const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim();
+        const frontendUrl = frontendUrlPrincipal();
         await enviarEmailVerificacao({
             destinatario: usuario.email,
             nome: usuario.nome,
@@ -353,7 +355,7 @@ app.post("/esqueci-senha", limitarTentativas({ limite: 4, janelaMs: 30 * 60 * 10
             [usuario.id, tokenHash]
         );
 
-        const link = `${process.env.FRONTEND_URL || "http://localhost:3000"}/redefinir-senha?token=${token}`;
+        const link = `${frontendUrlPrincipal()}/redefinir-senha?token=${token}`;
         await enviarEmailRecuperacao({
             destinatario: usuario.email,
             nome: usuario.nome,
@@ -642,30 +644,10 @@ app.put(
             });
         }
 
-        if (
-            typeof foto !== "string" ||
-            !foto
-        ) {
-            return res.status(400).json({
-                mensagem:
-                    "Foto não enviada.",
-            });
-        }
-
-        const tamanhoBase64 =
-            Buffer.byteLength(
-                foto,
-                "utf8"
-            );
-
-        if (
-            tamanhoBase64 >
-            3 * 1024 * 1024
-        ) {
-            return res.status(400).json({
-                mensagem:
-                    "A foto é muito grande. O limite é 3 MB.",
-            });
+        try {
+            validarFotoDataUrl(foto);
+        } catch (error) {
+            return res.status(error.status || 400).json({ mensagem: error.message, codigo: error.codigo });
         }
 
         try {
@@ -997,6 +979,10 @@ app.put(
             });
         }
 
+        if (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento)) {
+            return res.status(400).json({ mensagem: "Forma de pagamento inválida." });
+        }
+
         if (
             nome !== undefined &&
             (
@@ -1143,7 +1129,7 @@ app.put(
                         return res.status(400).json({ mensagem: "Selecione um cartão válido." });
                     }
                     if (cartaoId) {
-                        const cartao = await cliente.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                        const cartao = await cliente.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
                         if (!cartao.rowCount) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
                         const hoje = new Date();
                         const bloqueada = await cliente.query("SELECT 1 FROM faturas_cartao WHERE cartao_id = $1 AND ano = $2 AND mes = $3 AND status <> 'aberta'", [cartaoId, hoje.getFullYear(), hoje.getMonth() + 1]);
@@ -1515,6 +1501,9 @@ app.post(
             });
         }
 
+        if (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento)) {
+            return res.status(400).json({ mensagem: "Forma de pagamento inválida." });
+        }
         const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
         const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
         const totalParcelas = formaPagamento === "credito" ? Number(parcelas ?? 1) : 1;
@@ -1530,7 +1519,7 @@ app.post(
             await client.query("BEGIN");
             let cartaoNome = null;
             if (cartaoId) {
-                const cartao = await client.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                const cartao = await client.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
                 if (!cartao.rowCount) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
                 cartaoNome = cartao.rows[0].nome;
             }
@@ -1715,6 +1704,10 @@ app.put(
             });
         }
 
+        if (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento)) {
+            return res.status(400).json({ mensagem: "Forma de pagamento inválida." });
+        }
+
         if (
             quantidade !== undefined &&
             quantidade !== null &&
@@ -1754,7 +1747,8 @@ app.put(
                      FROM movimentacoes m
                      LEFT JOIN listas l
                         ON l.movimentacao_id = m.id
-                     WHERE m.id = $1`,
+                     WHERE m.id = $1
+                     FOR UPDATE OF m`,
                     [movimentacaoId]
                 );
 
@@ -1795,6 +1789,24 @@ app.put(
                 });
             }
 
+            if (movimentacao.fatura_pagamento_id) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "O pagamento de uma fatura não pode ser alterado." });
+            }
+            if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
+                await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);
+                const faturaProtegida = await client.query(
+                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
+                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
+                     AND status <> 'aberta'`,
+                    [movimentacao.cartao_id, movimentacao.data]
+                );
+                if (faturaProtegida.rowCount) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ mensagem: "Movimentações de uma fatura fechada ou paga não podem ser alteradas." });
+                }
+            }
+
             const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
             const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
             if (formaPagamento === "credito") {
@@ -1802,10 +1814,20 @@ app.put(
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
                 }
-                const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
                 if (!cartao.rowCount) {
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Cartão inválido." });
+                }
+                const faturaDestino = await client.query(
+                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
+                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
+                     AND status <> 'aberta'`,
+                    [cartaoId, data]
+                );
+                if (faturaDestino.rowCount) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ mensagem: "A fatura selecionada já foi fechada ou paga." });
                 }
             }
 
@@ -1970,9 +1992,10 @@ app.delete(
 
             const movimentacaoResult =
                 await client.query(
-                    `SELECT usuario_id
+                    `SELECT usuario_id, forma_pagamento, cartao_id, data, fatura_pagamento_id
                      FROM movimentacoes
-                     WHERE id = $1`,
+                     WHERE id = $1
+                     FOR UPDATE`,
                     [movimentacaoId]
                 );
 
@@ -2006,6 +2029,25 @@ app.delete(
                     mensagem:
                         "Você não pode excluir esta movimentação.",
                 });
+            }
+
+            const movimentacao = movimentacaoResult.rows[0];
+            if (movimentacao.fatura_pagamento_id) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "O pagamento de uma fatura não pode ser excluído." });
+            }
+            if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
+                await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);
+                const faturaProtegida = await client.query(
+                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
+                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
+                     AND status <> 'aberta'`,
+                    [movimentacao.cartao_id, movimentacao.data]
+                );
+                if (faturaProtegida.rowCount) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ mensagem: "Movimentações de uma fatura fechada ou paga não podem ser excluídas." });
+                }
             }
 
             // =================================================
