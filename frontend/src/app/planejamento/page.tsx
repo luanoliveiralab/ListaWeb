@@ -7,6 +7,12 @@ import { useUsuario } from "@/hooks/useUsuario";
 import { useToast } from "@/providers/ToastProvider";
 import { planejamentoService } from "@/services/planejamento.service";
 import type { Meta, MetaMovimentacao, Recorrencia } from "@/types/Planejamento";
+import type { Orcamento } from "@/types/Orcamento";
+import type { Movimentacao } from "@/types/Movimentacao";
+import BudgetPanel from "@/components/financas/BudgetPanel";
+import PeriodSelector from "@/components/shared/PeriodSelector";
+import { orcamentosService } from "@/services/orcamentos.service";
+import { usePeriod } from "@/context/PeriodContext";
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const categorias = ["Mercado", "Moradia", "Transporte", "Saúde", "Educação", "Lazer", "Salário", "Freelance", "Investimentos", "Outros"];
@@ -14,8 +20,11 @@ const categorias = ["Mercado", "Moradia", "Transporte", "Saúde", "Educação", 
 export default function PlanejamentoPage() {
   const { usuario } = useUsuario();
   const { mostrarAviso } = useToast();
+  const { mes, ano, setMes, setAno } = usePeriod();
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
+  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
   const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
   const [meta, setMeta] = useState({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
@@ -31,6 +40,37 @@ export default function PlanejamentoPage() {
       })
       .catch(() => mostrarAviso("Não foi possível carregar o planejamento.", "erro"));
   }, [mostrarAviso, usuario]);
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+
+    Promise.all([
+      orcamentosService.buscar(usuario.id, mes, ano),
+      planejamentoService.gerarRecorrencias(mes, ano),
+    ])
+      .then(([listaOrcamentos, resposta]) => {
+        setOrcamentos(listaOrcamentos);
+        setMovimentacoes(resposta.movimentacoes);
+      })
+      .catch(() => mostrarAviso("Não foi possível carregar os orçamentos.", "erro"));
+  }, [ano, mes, mostrarAviso, usuario?.id]);
+
+  async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
+    const salvo = await orcamentosService.salvar({ categoria: categoriaOrcamento, valor: valorOrcamento, mes, ano });
+    setOrcamentos((atuais) => {
+      const existe = atuais.some((item) => item.id === salvo.id);
+      return existe
+        ? atuais.map((item) => item.id === salvo.id ? salvo : item)
+        : [...atuais, salvo].sort((a, b) => a.categoria.localeCompare(b.categoria));
+    });
+    mostrarAviso("Orçamento salvo com sucesso!");
+  }
+
+  async function removerOrcamento(id: number) {
+    await orcamentosService.remover(id);
+    setOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
+    mostrarAviso("Orçamento removido.");
+  }
 
   async function criarRecorrencia(event: FormEvent) {
     event.preventDefault();
@@ -94,7 +134,16 @@ export default function PlanejamentoPage() {
         </div>
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-2">
+      <PeriodSelector mes={mes} ano={ano} onMesChange={setMes} onAnoChange={setAno} />
+
+      <BudgetPanel
+        orcamentos={orcamentos}
+        movimentacoes={movimentacoes}
+        onSalvar={salvarOrcamento}
+        onRemover={removerOrcamento}
+      />
+
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
         <section className="surface p-5 sm:p-6">
           <div className="section-header">
             <h2 className="section-title flex items-center gap-2"><CalendarClock size={21} /> Recorrências mensais</h2>

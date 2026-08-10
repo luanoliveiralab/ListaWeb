@@ -22,9 +22,6 @@ import PeriodSelector from "@/components/shared/PeriodSelector";
 
 import { usePeriod } from "@/context/PeriodContext";
 import { useToast } from "@/providers/ToastProvider";
-import BudgetPanel from "@/components/financas/BudgetPanel";
-import { orcamentosService } from "@/services/orcamentos.service";
-import type { Orcamento } from "@/types/Orcamento";
 import { planejamentoService } from "@/services/planejamento.service";
 import CreditCardsPanel from "@/components/financas/CreditCardsPanel";
 import { cartoesService } from "@/services/cartoes.service";
@@ -35,7 +32,6 @@ export default function FinancasPage() {
     const { mostrarAviso } = useToast();
 
     const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
-    const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
     const [cartoes, setCartoes] = useState<Cartao[]>([]);
     const [carregandoCartoes, setCarregandoCartoes] = useState(true);
     const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
@@ -93,17 +89,6 @@ export default function FinancasPage() {
     useEffect(() => {
         if (!usuario?.id) return;
 
-        orcamentosService.buscar(usuario.id, mes, ano)
-            .then(setOrcamentos)
-            .catch((err) => {
-                console.error(err);
-                mostrarAviso("Não foi possível carregar os orçamentos.", "erro");
-            });
-    }, [ano, mes, mostrarAviso, usuario]);
-
-    useEffect(() => {
-        if (!usuario?.id) return;
-
         cartoesService.listar()
             .then(setCartoes)
             .catch((err) => {
@@ -139,29 +124,6 @@ export default function FinancasPage() {
             console.error(err);
             mostrarAviso("Não foi possível remover o cartão.", "erro");
         }
-    }
-
-    async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
-        const salvo = await orcamentosService.salvar({
-            categoria: categoriaOrcamento,
-            valor: valorOrcamento,
-            mes,
-            ano,
-        });
-
-        setOrcamentos((atuais) => {
-            const existe = atuais.some((item) => item.id === salvo.id);
-            return existe
-                ? atuais.map((item) => item.id === salvo.id ? salvo : item)
-                : [...atuais, salvo].sort((a, b) => a.categoria.localeCompare(b.categoria));
-        });
-        mostrarAviso("Orçamento salvo com sucesso!");
-    }
-
-    async function removerOrcamento(id: number) {
-        await orcamentosService.remover(id);
-        setOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
-        mostrarAviso("Orçamento removido.");
     }
 
     // =========================
@@ -355,13 +317,6 @@ export default function FinancasPage() {
                     movimentacoes={movimentacoes}
                 />
             </div>
-
-            <BudgetPanel
-                orcamentos={orcamentos}
-                movimentacoes={movimentacoesFiltradas}
-                onSalvar={salvarOrcamento}
-                onRemover={removerOrcamento}
-            />
 
             <CreditCardsPanel
                 cartoes={cartoes}
