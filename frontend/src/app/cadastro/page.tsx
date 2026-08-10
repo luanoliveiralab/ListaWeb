@@ -83,12 +83,12 @@ export default function CadastroPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 pb-10 pt-24 sm:py-10">
 
       <div className="pointer-events-none absolute -left-32 -top-32 size-96 rounded-full bg-primary/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -right-24 size-96 rounded-full bg-blue-500/10 blur-3xl" />
 
-      <div className="absolute top-6 right-6">
+      <div className="absolute right-4 top-4 z-40 sm:right-6 sm:top-6">
         <ThemeToggle />
       </div>
 
