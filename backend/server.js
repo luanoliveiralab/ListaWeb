@@ -9,7 +9,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { pool, verificarConexao } = require("./src/db");
-const { enviarEmailRecuperacao } = require("./src/email");
+const { enviarEmailRecuperacao, enviarEmailVerificacao } = require("./src/email");
 const { autenticar } = require("./src/middleware/autenticar");
 const { cookieOptions, csrfCookieOptions, criarTokenCsrf, protegerCsrf, limitarTentativas, limparTentativas } = require("./src/security");
 const recorrenciasRouter = require("./src/routes/recorrencias");
@@ -106,12 +106,18 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         .trim()
         .toLowerCase();
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailLimpo) || emailLimpo.length > 255) {
+        return res.status(400).json({ mensagem: "Informe um e-mail válido." });
+    }
+
     if (senha.length < 10 || senha.length > 128) {
         return res.status(400).json({
             mensagem:
                 "A senha deve ter entre 10 e 128 caracteres.",
         });
     }
+
+    let usuarioIdCriado = null;
 
     try {
         const existe = await pool.query(
@@ -133,10 +139,8 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         );
 
         const result = await pool.query(
-            `INSERT INTO usuarios
-                (nome, email, senha)
-             VALUES
-                ($1, $2, $3)
+            `INSERT INTO usuarios (nome, email, senha, email_verificado)
+             VALUES ($1, $2, $3, FALSE)
              RETURNING id, nome, email, foto`,
             [
                 nomeLimpo,
@@ -146,24 +150,32 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         );
 
         const usuario = result.rows[0];
+        usuarioIdCriado = usuario.id;
 
-        const token = jwt.sign(
-            { id: usuario.id, v: 0 },
-            process.env.JWT_SECRET,
-            { expiresIn: "8h" }
+        const tokenVerificacao = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(tokenVerificacao).digest("hex");
+        await pool.query(
+            `INSERT INTO verificacoes_email (usuario_id, token_hash, expira_em)
+             VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+            [usuario.id, tokenHash]
         );
+        const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim();
+        await enviarEmailVerificacao({
+            destinatario: usuario.email,
+            nome: usuario.nome,
+            link: `${frontendUrl}/verificar-email?token=${tokenVerificacao}`,
+        });
 
-        res.cookie("listaweb_token", token, cookieOptions());
-        const csrfToken = criarTokenCsrf();
-        res.cookie("listaweb_csrf", csrfToken, csrfCookieOptions());
         limparTentativas(req);
 
         return res.status(201).json({
             mensagem: "Usuário criado.",
-            csrfToken,
-            usuario,
+            email: usuario.email,
         });
     } catch (err) {
+        if (usuarioIdCriado) {
+            await pool.query("DELETE FROM usuarios WHERE id = $1", [usuarioIdCriado]).catch(() => undefined);
+        }
         console.error(
             "Erro no cadastro:",
             err
@@ -172,6 +184,41 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         return res.status(500).json({
             mensagem: "Erro no cadastro.",
         });
+    }
+});
+
+app.post("/verificar-email", limitarTentativas({ limite: 10, janelaMs: 30 * 60 * 1000 }), async (req, res) => {
+    const token = typeof req.body.token === "string" ? req.body.token : "";
+    if (!/^[a-f0-9]{64}$/.test(token)) {
+        return res.status(400).json({ mensagem: "Link de confirmação inválido." });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const verificacao = await client.query(
+            `SELECT id, usuario_id FROM verificacoes_email
+             WHERE token_hash = $1 AND usado_em IS NULL AND expira_em > NOW()
+             FOR UPDATE`,
+            [tokenHash]
+        );
+        if (!verificacao.rowCount) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensagem: "Este link é inválido ou expirou." });
+        }
+
+        await client.query("UPDATE usuarios SET email_verificado = TRUE WHERE id = $1", [verificacao.rows[0].usuario_id]);
+        await client.query("UPDATE verificacoes_email SET usado_em = NOW() WHERE id = $1", [verificacao.rows[0].id]);
+        await client.query("COMMIT");
+        limparTentativas(req);
+        return res.json({ mensagem: "E-mail confirmado com sucesso!" });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("Erro ao confirmar e-mail:", err);
+        return res.status(500).json({ mensagem: "Não foi possível confirmar o e-mail." });
+    } finally {
+        client.release();
     }
 });
 
@@ -199,7 +246,7 @@ app.post("/login", limitarTentativas(), async (req, res) => {
 
     try {
         const result = await pool.query(
-            `SELECT id, nome, email, foto, senha, token_version
+            `SELECT id, nome, email, foto, senha, token_version, email_verificado
              FROM usuarios
              WHERE email = $1`,
             [
@@ -218,6 +265,10 @@ app.post("/login", limitarTentativas(), async (req, res) => {
         }
 
         const user = result.rows[0];
+
+        if (!user.email_verificado) {
+            return res.status(403).json({ mensagem: "Confirme seu e-mail antes de entrar." });
+        }
 
         const senhaValida = typeof user.senha === "string" && user.senha.startsWith("$2")
             ? await bcrypt.compare(

@@ -20,6 +20,10 @@ export const authService = {
         return api.authPost("/cadastro", dados);
     },
 
+    verificarEmail(token: string) {
+        return api.authPost("/verificar-email", { token });
+    },
+
     aquecerApi() {
         return api.get(`/health?warmup=${Date.now()}`);
     },

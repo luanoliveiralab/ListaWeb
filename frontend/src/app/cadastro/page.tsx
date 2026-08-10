@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { MailCheck } from "lucide-react";
 
 import { authService } from "@/services/auth.service";
 
@@ -13,7 +13,7 @@ import { useToast } from "@/providers/ToastProvider";
 
 export default function CadastroPage() {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [emailEnviado, setEmailEnviado] = useState("");
 
   const { mostrarAviso } = useToast();
 
@@ -58,13 +58,7 @@ export default function CadastroPage() {
         senha,
       });
 
-      localStorage.setItem(
-        "usuario",
-        JSON.stringify(data.usuario)
-      );
-      sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
-
-      router.replace("/dashboard");
+      setEmailEnviado(data.email || email);
     } catch (err: unknown) {
       mostrarAviso(
         err instanceof Error
@@ -102,6 +96,13 @@ export default function CadastroPage() {
           </p>
         </div>
 
+        {emailEnviado ? (
+          <div className="rounded-2xl bg-emerald-500/10 p-5 text-center">
+            <MailCheck className="mx-auto text-emerald-600" size={30} />
+            <p className="mt-3 font-medium">Confirme seu e-mail</p>
+            <p className="mt-1 text-sm text-muted-foreground">Enviamos um link para <strong>{emailEnviado}</strong>. Abra-o para ativar sua conta.</p>
+          </div>
+        ) : <>
         <input
           type="text"
           name="nome"
@@ -145,6 +146,7 @@ export default function CadastroPage() {
         >
           {loading ? "Criando..." : "Criar Conta"}
         </button>
+        </>}
 
         <div className="mt-6 text-center">
           <p className="text-muted-foreground">

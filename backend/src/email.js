@@ -64,4 +64,41 @@ async function enviarEmailRecuperacao(dados) {
     throw new Error("Provedor de e-mail não configurado.");
 }
 
-module.exports = { enviarEmailRecuperacao };
+async function enviarEmailVerificacao({ destinatario, nome, link }) {
+    const assunto = "Confirme seu e-mail — ListaWeb";
+    const texto = `Olá, ${nome}. Confirme seu e-mail para ativar sua conta: ${link}`;
+    const html = `<p>Olá, ${escaparHtml(nome)}.</p><p>Confirme seu endereço de e-mail para ativar sua conta no ListaWeb.</p><p><a href="${escaparHtml(link)}">Confirmar meu e-mail</a></p><p>Este link expira em 24 horas.</p>`;
+
+    if (process.env.BREVO_API_KEY) {
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: { accept: "application/json", "api-key": process.env.BREVO_API_KEY, "content-type": "application/json" },
+            body: JSON.stringify({
+                sender: remetenteConfigurado(),
+                to: [{ email: destinatario, name: nome }],
+                subject: assunto,
+                textContent: texto,
+                htmlContent: html,
+            }),
+            signal: AbortSignal.timeout(15_000),
+        });
+        if (!response.ok) throw new Error(`Brevo recusou o envio (${response.status}).`);
+        return;
+    }
+
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: process.env.SMTP_SECURE === "true",
+            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+            connectionTimeout: 15_000,
+        });
+        await transporter.sendMail({ from: process.env.SMTP_FROM, to: destinatario, subject: assunto, text: texto, html });
+        return;
+    }
+
+    throw new Error("Provedor de e-mail não configurado.");
+}
+
+module.exports = { enviarEmailRecuperacao, enviarEmailVerificacao };

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email_verificado BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE TABLE IF NOT EXISTS movimentacoes (
     id SERIAL PRIMARY KEY,
@@ -82,6 +83,15 @@ CREATE TABLE IF NOT EXISTS recuperacoes_senha (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS verificacoes_email (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expira_em TIMESTAMPTZ NOT NULL,
+    usado_em TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS meta_movimentacoes (
     id SERIAL PRIMARY KEY,
     meta_id INTEGER NOT NULL REFERENCES metas(id) ON DELETE CASCADE,
@@ -111,6 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_orcamentos_usuario_periodo
 CREATE INDEX IF NOT EXISTS idx_recorrencias_usuario ON recorrencias(usuario_id, ativa);
 CREATE INDEX IF NOT EXISTS idx_metas_usuario ON metas(usuario_id, concluida);
 CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario ON recuperacoes_senha(usuario_id, expira_em DESC);
+CREATE INDEX IF NOT EXISTS idx_verificacoes_email_usuario ON verificacoes_email(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_meta_movimentacoes_meta ON meta_movimentacoes(meta_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
