@@ -63,9 +63,6 @@ export default function FinanceTable({
         { receitas: 0, despesas: 0 }
     );
     const saldoRelatorio = resumo.receitas - resumo.despesas;
-    const ticketMedio = movimentacoesVisiveis.length
-        ? (resumo.receitas + resumo.despesas) / movimentacoesVisiveis.length
-        : 0;
     const filtrosAtivos = [
         filtro !== "todas" ? `Tipo: ${filtro}` : "",
         categoriaSelecionada ? `Categoria: ${categoriaSelecionada}` : "",
@@ -279,7 +276,7 @@ export default function FinanceTable({
                 <div><span>Receitas</span><strong className="report-positive">{formatarValor(resumo.receitas)}</strong></div>
                 <div><span>Despesas</span><strong className="report-negative">{formatarValor(resumo.despesas)}</strong></div>
                 <div><span>Saldo</span><strong>{formatarValor(saldoRelatorio)}</strong></div>
-                <div><span>Ticket médio</span><strong>{formatarValor(ticketMedio)}</strong></div>
+                <div><span>Movimentações</span><strong>{movimentacoesVisiveis.length}</strong></div>
             </section>
 
             <section className="report-details">
@@ -289,7 +286,7 @@ export default function FinanceTable({
                 </div>
                 <table>
                     <thead>
-                        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th className="report-number">Valor</th></tr>
+                        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Origem</th><th className="report-number">Valor</th></tr>
                     </thead>
                     <tbody>
                         {movimentacoesVisiveis.map((mov) => (
@@ -297,7 +294,7 @@ export default function FinanceTable({
                                 <td>{new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</td>
                                 <td>{mov.descricao}{mov.quantidade != null ? ` (${mov.quantidade} un.)` : ""}</td>
                                 <td>{mov.categoria}</td>
-                                <td>{mov.tipo === "receita" ? "Receita" : "Despesa"}</td>
+                                <td>{mov.tipo === "receita" ? "Receita" : mov.forma_pagamento === "credito" ? `Crédito - ${mov.cartao_nome || "Cartão"}` : "Saldo"}</td>
                                 <td className={`report-number ${mov.tipo === "receita" ? "report-positive" : "report-negative"}`}>
                                     {mov.tipo === "receita" ? "+" : "-"} {formatarValor(Number(mov.valor))}
                                 </td>

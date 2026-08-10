@@ -57,7 +57,7 @@ export function ToastProvider({
             {children}
 
             {aviso && (
-                <div className="fixed inset-x-4 top-4 z-[100] animate-in fade-in slide-in-from-top-4 sm:left-auto sm:right-6 sm:top-6 sm:w-full sm:max-w-sm">
+                <div className="fixed inset-x-4 top-4 z-[100] animate-in fade-in slide-in-from-top-4 print:hidden sm:left-auto sm:right-6 sm:top-6 sm:w-full sm:max-w-sm">
                     <div
                         role={alerta || !sucesso ? "alert" : "status"}
                         className={`flex items-start gap-3 rounded-2xl border p-4 shadow-xl ${sucesso

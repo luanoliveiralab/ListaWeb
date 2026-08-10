@@ -395,25 +395,47 @@ button:disabled,
     margin: 14mm;
   }
 
-  body * {
-    visibility: hidden;
+  html,
+  body {
+    min-height: 0 !important;
+    background: white !important;
   }
 
-  .print-report,
-  .print-report * {
-    visibility: visible;
+  .app-shell,
+  .app-content,
+  .app-main {
+    display: block !important;
+    min-height: 0 !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    animation: none !important;
+  }
+
+  .app-shell > :not(.app-content),
+  .app-content > :not(.app-main),
+  .app-main > :not(.print-report) {
+    display: none !important;
+  }
+
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"] {
+    display: none !important;
   }
 
   .print-report {
     display: block !important;
-    position: absolute;
-    inset: 0;
+    position: static;
     width: 100%;
     background: white;
     color: #172033;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 10pt;
     line-height: 1.45;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   .report-header {
@@ -423,6 +445,7 @@ button:disabled,
     gap: 24px;
     padding: 0 0 18px;
     border-bottom: 3px solid #2563eb;
+    break-after: avoid;
   }
 
   .report-brand {
@@ -481,6 +504,7 @@ button:disabled,
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
     margin: 18px 0 22px;
+    break-inside: avoid;
   }
 
   .report-summary > div {
@@ -528,6 +552,10 @@ button:disabled,
 
   .report-details thead {
     display: table-header-group;
+  }
+
+  .report-details tbody {
+    break-before: avoid;
   }
 
   .report-details th {
@@ -600,6 +628,7 @@ button:disabled,
     border-top: 1px solid #cbd5e1;
     color: #64748b;
     font-size: 7.5pt;
+    break-inside: avoid;
   }
 }
 

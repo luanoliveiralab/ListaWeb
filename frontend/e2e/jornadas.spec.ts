@@ -94,6 +94,25 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Finanças/ })).toBeVisible();
 });
 
+test("gera o relatório financeiro sem páginas vazias", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "A geração de PDF usa o motor desktop de impressão.");
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/financas");
+  await expect(page.getByRole("button", { name: "Salvar em PDF" })).toBeEnabled();
+
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".print-report")).toHaveCSS("display", "block");
+  await expect(page.locator(".app-main > :not(.print-report)").first()).toHaveCSS("display", "none");
+  const pdf = await page.pdf({ format: "A4", printBackground: true });
+  const paginas = pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length ?? 0;
+  expect(paginas).toBe(1);
+  await testInfo.attach("relatorio-financeiro.pdf", { body: pdf, contentType: "application/pdf" });
+});
+
 test("mantém a caixa de notificações dentro da tela", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/");
