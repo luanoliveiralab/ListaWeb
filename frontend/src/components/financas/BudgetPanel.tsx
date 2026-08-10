@@ -5,6 +5,7 @@ import { PiggyBank, Plus, Trash2 } from "lucide-react";
 import type { Movimentacao } from "@/types/Movimentacao";
 import type { Orcamento } from "@/types/Orcamento";
 import { useCategorias } from "@/hooks/useCategorias";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 interface Props {
   orcamentos: Orcamento[];
@@ -20,6 +21,8 @@ export default function BudgetPanel({ orcamentos, movimentacoes, onSalvar, onRem
   const [valor, setValor] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [formularioAberto, setFormularioAberto] = useState(false);
+  const [orcamentoParaExcluir, setOrcamentoParaExcluir] = useState<Orcamento | null>(null);
+  const [removendo, setRemovendo] = useState(false);
   const { categorias } = useCategorias("despesa");
 
   async function salvar(event: React.FormEvent) {
@@ -31,6 +34,13 @@ export default function BudgetPanel({ orcamentos, movimentacoes, onSalvar, onRem
       await onSalvar(categoria, valorNumero);
       setCategoria(""); setValor(""); setFormularioAberto(false);
     } finally { setSalvando(false); }
+  }
+
+  async function confirmarRemocao() {
+    if (!orcamentoParaExcluir) return;
+    setRemovendo(true);
+    try { await onRemover(orcamentoParaExcluir.id); setOrcamentoParaExcluir(null); }
+    finally { setRemovendo(false); }
   }
 
   return (
@@ -58,10 +68,11 @@ export default function BudgetPanel({ orcamentos, movimentacoes, onSalvar, onRem
           {orcamentos.map((orcamento) => {
             const gasto = movimentacoes.filter((mov) => mov.tipo === "despesa" && mov.categoria === orcamento.categoria).reduce((total, mov) => total + Number(mov.valor), 0);
             const limite = Number(orcamento.valor); const percentual = Math.min((gasto / limite) * 100, 100); const estourado = gasto > limite; const alerta = !estourado && percentual >= 80;
-            return <article key={orcamento.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-medium">{orcamento.categoria}</h3><p className="mt-1 text-xs text-muted-foreground">{moeda(gasto)} de {moeda(limite)}</p></div><button type="button" onClick={() => onRemover(orcamento.id)} className="icon-button hover:text-destructive" aria-label={`Remover orçamento de ${orcamento.categoria}`}><Trash2 size={16} /></button></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full transition-[width] duration-700 ${estourado ? "bg-rose-500" : alerta ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${percentual}%` }} /></div><p className={`mt-2 text-xs font-medium ${estourado ? "text-rose-600" : alerta ? "text-amber-600" : "text-muted-foreground"}`}>{estourado ? `${moeda(gasto - limite)} acima do limite` : `${Math.round(percentual)}% utilizado`}</p></article>;
+            return <article key={orcamento.id} className="rounded-2xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-medium">{orcamento.categoria}</h3><p className="mt-1 text-xs text-muted-foreground">{moeda(gasto)} de {moeda(limite)}</p></div><button type="button" onClick={() => setOrcamentoParaExcluir(orcamento)} className="icon-button hover:text-destructive" aria-label={`Remover orçamento de ${orcamento.categoria}`}><Trash2 size={16} /></button></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full transition-[width] duration-700 ${estourado ? "bg-rose-500" : alerta ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${percentual}%` }} /></div><p className={`mt-2 text-xs font-medium ${estourado ? "text-rose-600" : alerta ? "text-amber-600" : "text-muted-foreground"}`}>{estourado ? `${moeda(gasto - limite)} acima do limite` : `${Math.round(percentual)}% utilizado`}</p></article>;
           })}
         </div>
       )}
+      <ConfirmationDialog aberto={Boolean(orcamentoParaExcluir)} titulo="Excluir este orçamento?" descricao={<>O limite mensal de <strong>{orcamentoParaExcluir?.categoria}</strong> será removido. As movimentações existentes não serão alteradas.</>} confirmar="Sim, excluir orçamento" processando={removendo} textoProcessando="Excluindo..." onConfirmar={confirmarRemocao} onAlterar={(aberto) => { if (!aberto) setOrcamentoParaExcluir(null); }} />
     </section>
   );
 }

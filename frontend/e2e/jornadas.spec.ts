@@ -26,6 +26,14 @@ async function prepararApi(page: Page) {
       });
     }
     if (pathname === "/me") return responderJson(route, usuario);
+    if (pathname === "/cartoes") return responderJson(route, [{ id: 1, usuario_id: 42, nome: "Principal", instituicao: "Nubank", limite_disponivel: 2000, dia_vencimento: 10, created_at: new Date().toISOString() }]);
+    if (pathname === "/cartoes/1/faturas") return responderJson(route, [{ ano: 2026, mes: 9, status: "fechada", total: 180, quantidade: 1, vencimento: "2026-10-10" }, { ano: 2026, mes: 8, status: "aberta", total: 250, quantidade: 1, vencimento: "2026-09-10" }]);
+    if (/^\/cartoes\/1\/faturas\/\d{4}\/\d{1,2}$/.test(pathname)) return responderJson(route, [{ id: 2, descricao: "Mercado", valor: 250, categoria: "Mercado", data: "2026-08-10", created_at: new Date().toISOString() }]);
+    if (pathname === "/financas") return responderJson(route, []);
+    if (pathname === "/orcamentos/42") return responderJson(route, [{ id: 1, categoria: "Mercado", valor: 800, mes: 8, ano: 2026 }]);
+    if (pathname === "/recorrencias/gerar") return responderJson(route, { geradas: 0, movimentacoes: [] });
+    if (pathname === "/recorrencias") return responderJson(route, [{ id: 1, tipo: "despesa", descricao: "Aluguel", valor: 1200, categoria: "Moradia", dia: 5, ativa: true }]);
+    if (pathname === "/metas") return responderJson(route, [{ id: 1, nome: "Reserva", valor_alvo: 10000, valor_atual: 1500, prazo: null, concluida: false }]);
     if (pathname === "/categorias") return responderJson(route, [
       { id: 1, nome: "Mercado", tipo: "despesa", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       { id: 2, nome: "Salário", tipo: "receita", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -102,4 +110,37 @@ test("mantém header e formulário fixos enquanto apenas categorias rolam", asyn
   await expect(page.getByRole("button", { name: "Sim, excluir categoria" })).toBeVisible();
   await page.getByRole("button", { name: "Cancelar" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).not.toBeVisible();
+});
+
+test("solicita confirmação visual nas exclusões financeiras e de planejamento", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+
+  await page.goto("/financas");
+  await page.getByRole("button", { name: "Excluir Principal" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir este cartão?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.getByRole("button", { name: "Ver faturas de Principal" }).click();
+  await page.getByRole("button", { name: /agosto de 2026/i }).click();
+  await page.getByRole("button", { name: "Fechar fatura" }).click();
+  await expect(page.getByRole("heading", { name: "Fechar esta fatura?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.getByRole("button", { name: /setembro de 2026/i }).click();
+  await page.getByRole("button", { name: "Pagar pelo saldo" }).click();
+  await expect(page.getByRole("heading", { name: "Pagar esta fatura pelo saldo?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.getByRole("button", { name: "Fechar histórico de faturas" }).click();
+
+  await page.goto("/planejamento");
+  await page.getByRole("button", { name: "Remover orçamento de Mercado" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir este orçamento?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.getByRole("button", { name: "Excluir recorrência Aluguel" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir esta recorrência?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.getByRole("button", { name: "Excluir meta Reserva" }).click();
+  await expect(page.getByRole("heading", { name: "Excluir esta meta?" })).toBeVisible();
 });

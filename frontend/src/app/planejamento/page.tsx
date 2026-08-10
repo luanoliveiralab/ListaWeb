@@ -15,6 +15,7 @@ import PeriodSelector from "@/components/shared/PeriodSelector";
 import { orcamentosService } from "@/services/orcamentos.service";
 import { usePeriod } from "@/context/PeriodContext";
 import { useCategorias } from "@/hooks/useCategorias";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numeroMoeda = (valor: string) => Number(valor.includes(",") ? valor.replace(/\./g, "").replace(",", ".") : valor);
@@ -32,6 +33,8 @@ export default function PlanejamentoPage() {
   const [movimento, setMovimento] = useState({ tipo: "deposito", valor: "", observacao: "" });
   const [recorrenciaAberta, setRecorrenciaAberta] = useState(false);
   const [metaAberta, setMetaAberta] = useState(false);
+  const [exclusao, setExclusao] = useState<{ tipo: "recorrencia"; item: Recorrencia } | { tipo: "meta"; item: Meta } | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
   const recorrenciasKey = ["recorrencias", usuario?.id] as const;
   const metasKey = ["metas", usuario?.id] as const;
   const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
@@ -79,6 +82,26 @@ export default function PlanejamentoPage() {
     await orcamentosService.remover(id);
     atualizarOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
     mostrarAviso("Orçamento removido.");
+  }
+
+  async function confirmarExclusao() {
+    if (!exclusao) return;
+    setExcluindo(true);
+    try {
+      if (exclusao.tipo === "recorrencia") {
+        await planejamentoService.removerRecorrencia(exclusao.item.id);
+        atualizarRecorrencias((lista) => lista.filter((item) => item.id !== exclusao.item.id));
+        sincronizarFinancas();
+        mostrarAviso("Recorrência excluída.");
+      } else {
+        await planejamentoService.removerMeta(exclusao.item.id);
+        atualizarMetas((lista) => lista.filter((item) => item.id !== exclusao.item.id));
+        if (metaSelecionada?.id === exclusao.item.id) setMetaSelecionada(null);
+        mostrarAviso("Meta excluída.");
+      }
+      setExclusao(null);
+    } catch (error) { mostrarAviso(error instanceof Error ? error.message : "Não foi possível concluir a exclusão.", "erro"); }
+    finally { setExcluindo(false); }
   }
 
   async function criarRecorrencia(event: FormEvent) {
@@ -177,7 +200,7 @@ export default function PlanejamentoPage() {
                 <span className={`planning-kind ${item.tipo}`}><TipoIcon size={18} /></span>
                 <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{item.descricao}</strong><span className={`status-pill ${item.ativa ? "active" : "paused"}`}>{item.ativa ? "Ativa" : "Pausada"}</span></div><p className="planning-detail">{item.categoria} <span>•</span> todo dia {item.dia}</p></div>
                 <strong className={item.tipo === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{item.tipo === "receita" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong>
-                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label="Excluir recorrência" onClick={async () => { await planejamentoService.removerRecorrencia(item.id); atualizarRecorrencias((lista) => lista.filter((r) => r.id !== item.id)); sincronizarFinancas(); }}><Trash2 size={17} /></button></div>
+                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label={`Excluir recorrência ${item.descricao}`} onClick={() => setExclusao({ tipo: "recorrencia", item })}><Trash2 size={17} /></button></div>
               </article>;
             })}
             {!recorrencias.length && <p className="empty-state">Nenhuma recorrência cadastrada.</p>}
@@ -201,7 +224,7 @@ export default function PlanejamentoPage() {
             {metas.map((item) => {
               const progresso = Math.min(100, Math.round(Number(item.valor_atual) / Number(item.valor_alvo) * 100));
               return <article key={item.id} className="planning-goal">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label="Excluir meta" onClick={async () => { await planejamentoService.removerMeta(item.id); atualizarMetas((lista) => lista.filter((m) => m.id !== item.id)); }}><Trash2 size={17} /></button></div>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label={`Excluir meta ${item.nome}`} onClick={() => setExclusao({ tipo: "meta", item })}><Trash2 size={17} /></button></div>
                 <div className="mt-4 flex items-end justify-between gap-3"><div><span className="text-xs text-muted-foreground">Valor acumulado</span><p className="font-semibold">{moeda.format(Number(item.valor_atual))} <span className="text-sm font-normal text-muted-foreground">de {moeda.format(Number(item.valor_alvo))}</span></p></div><strong className="text-primary">{progresso}%</strong></div>
                 <div className="progress-track" aria-label={`${progresso}% concluído`}><span style={{ width: `${progresso}%` }} /></div>
                 <button type="button" className="button-secondary mt-3 w-full" onClick={() => abrirMeta(item)}>Movimentar e ver histórico</button>
@@ -213,6 +236,7 @@ export default function PlanejamentoPage() {
       </div>
 
       {metaSelecionada && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setMetaSelecionada(null); }}><div className="modal-panel max-w-xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-medium text-primary">Meta financeira</p><h2 className="text-xl font-semibold">{metaSelecionada.nome}</h2><p className="mt-1 text-sm text-muted-foreground">Acumulado: {moeda.format(Number(metaSelecionada.valor_atual))}</p></div><button className="icon-button" onClick={() => setMetaSelecionada(null)} aria-label="Fechar">×</button></div><form onSubmit={movimentarMeta} className="mt-6 grid gap-4 sm:grid-cols-2"><div className="field-group"><label className="field-label">Operação</label><select className="control" value={movimento.tipo} onChange={(e) => setMovimento({ ...movimento, tipo: e.target.value })}><option value="deposito">Adicionar valor</option><option value="retirada">Retirar valor</option></select></div><div className="field-group"><label className="field-label">Valor (R$)</label><input className="control" inputMode="decimal" placeholder="R$ 0,00" value={movimento.valor} onChange={(e) => setMovimento({ ...movimento, valor: e.target.value })} required /></div><div className="field-group sm:col-span-2"><label className="field-label">Observação opcional</label><input className="control" maxLength={255} placeholder="Ex.: economia do mês" value={movimento.observacao} onChange={(e) => setMovimento({ ...movimento, observacao: e.target.value })} /></div><button className="button-primary sm:col-span-2">Registrar movimentação</button></form><div className="mt-6 border-t border-border pt-5"><h3 className="font-semibold">Histórico</h3><div className="mt-3 max-h-56 space-y-2 overflow-y-auto">{historico.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 p-3 text-sm"><div><p className="font-medium">{item.observacao || (item.tipo === "deposito" ? "Valor adicionado" : "Valor retirado")}</p><p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("pt-BR")}</p></div><strong className={item.tipo === "deposito" ? "text-emerald-600" : "text-rose-600"}>{item.tipo === "deposito" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong></div>)}{!historico.length && <p className="py-5 text-center text-sm text-muted-foreground">Nenhuma movimentação registrada.</p>}</div></div></div></div>}
+      <ConfirmationDialog aberto={Boolean(exclusao)} titulo={exclusao?.tipo === "meta" ? "Excluir esta meta?" : "Excluir esta recorrência?"} descricao={exclusao?.tipo === "meta" ? <>A meta <strong>{exclusao.item.nome}</strong> e todo o histórico de valores associados serão removidos permanentemente.</> : <>A recorrência <strong>{exclusao?.item.descricao}</strong> deixará de gerar novas movimentações. Lançamentos já criados serão preservados.</>} confirmar={exclusao?.tipo === "meta" ? "Sim, excluir meta" : "Sim, excluir recorrência"} processando={excluindo} textoProcessando="Excluindo..." onConfirmar={confirmarExclusao} onAlterar={(aberto) => { if (!aberto) setExclusao(null); }} />
     </AppLayout>
   );
 }
