@@ -2,7 +2,7 @@ import { api } from "./api";
 import type { ItemLista } from "@/types/ItemLista";
 
 type NovoItem = Pick<ItemLista, "nome" | "quantidade" | "categoria" | "valor"> & { usuario_id: number };
-type AtualizacaoItem = Partial<Pick<ItemLista, "comprado" | "nome" | "quantidade" | "categoria" | "valor">>;
+type AtualizacaoItem = Partial<Pick<ItemLista, "comprado" | "nome" | "quantidade" | "categoria" | "valor">> & { forma_pagamento?: "saldo" | "credito"; cartao_id?: number | null };
 
 export const listaService = {
     buscarPorUsuario(id: number) {

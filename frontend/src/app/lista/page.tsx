@@ -16,6 +16,9 @@ import type { ItemLista } from "@/types/ItemLista";
 import EditItemModal from "@/components/lista/EditItemModal";
 import { Search } from "lucide-react";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import PurchasePaymentDialog from "@/components/lista/PurchasePaymentDialog";
+import { cartoesService } from "@/services/cartoes.service";
+import type { Cartao } from "@/types/Cartao";
 
 export default function ListaPage() {
   const { usuario } = useUsuario();
@@ -40,6 +43,13 @@ export default function ListaPage() {
     useState<ItemLista | null>(null);
 
   const [modalAberto, setModalAberto] = useState(false);
+  const [itemPagamento, setItemPagamento] = useState<ItemLista | null>(null);
+  const [registrandoCompra, setRegistrandoCompra] = useState(false);
+  const { data: cartoes = [], isPending: carregandoCartoes } = useQuery<Cartao[]>({
+    queryKey: ["cartoes", usuario?.id],
+    queryFn: cartoesService.listar,
+    enabled: Boolean(usuario?.id && itemPagamento),
+  });
 
   useEffect(() => {
     if (error) mostrarAviso("Erro ao carregar a lista de compras.", "erro");
@@ -171,37 +181,32 @@ export default function ListaPage() {
   // TOGGLE COMPRADO
   // =========================
 
-  async function toggleComprado(item: ItemLista) {
-    if (item.comprado) return;
+  function toggleComprado(item: ItemLista) {
+    if (!item.comprado) setItemPagamento(item);
+  }
+
+  async function confirmarCompra(formaPagamento: "saldo" | "credito", cartaoId?: number) {
+    if (!itemPagamento) return;
+    const item = itemPagamento;
+    setRegistrandoCompra(true);
     atualizarLista((itens) => itens.map((atual) => atual.id === item.id ? { ...atual, comprado: true } : atual));
-
     try {
-      const atualizado = await listaService.atualizar(
-        item.id,
-        {
-          comprado: true,
-        }
-      );
-
-      atualizarLista((prev) =>
-        prev.map((i) =>
-          i.id === atualizado.id
-            ? atualizado
-            : i
-        )
-      );
+      const atualizado = await listaService.atualizar(item.id, {
+        comprado: true,
+        forma_pagamento: formaPagamento,
+        cartao_id: formaPagamento === "credito" ? cartaoId : null,
+      });
+      atualizarLista((itens) => itens.map((atual) => atual.id === atualizado.id ? atualizado : atual));
+      setItemPagamento(null);
+      queryClient.invalidateQueries({ queryKey: ["financas", usuario?.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", usuario?.id] });
+      queryClient.invalidateQueries({ queryKey: ["avisos", usuario?.id] });
+      mostrarAviso(formaPagamento === "credito" ? "Compra adicionada à fatura do cartão." : "Compra descontada do saldo.");
     } catch (err) {
       atualizarLista((itens) => itens.map((atual) => atual.id === item.id ? item : atual));
-      console.error(
-        "Erro ao marcar item como comprado:",
-        err
-      );
-
-      mostrarAviso(
-        "Erro ao marcar item como comprado.",
-        "erro"
-      );
-    }
+      console.error("Erro ao marcar item como comprado:", err);
+      mostrarAviso(err instanceof Error ? err.message : "Erro ao marcar item como comprado.", "erro");
+    } finally { setRegistrandoCompra(false); }
   }
 
   // =========================
@@ -330,6 +335,8 @@ export default function ListaPage() {
       />
 
       <ConfirmationDialog aberto={Boolean(itemExcluir)} titulo="Excluir este item?" descricao={<>O item <strong>{itemExcluir?.nome}</strong> será removido da sua lista. Se ele gerou uma movimentação, o lançamento financeiro também será removido.</>} confirmar="Sim, excluir item" processando={excluindoItem} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoItem} onAlterar={(aberto) => { if (!aberto) setItemExcluir(null); }} />
+
+      <PurchasePaymentDialog key={itemPagamento?.id ?? "pagamento-fechado"} item={itemPagamento} cartoes={cartoes} carregandoCartoes={carregandoCartoes} processando={registrandoCompra} onConfirmar={confirmarCompra} onFechar={() => setItemPagamento(null)} />
 
       <EditItemModal
         key={itemEditando?.id ?? "fechado"}

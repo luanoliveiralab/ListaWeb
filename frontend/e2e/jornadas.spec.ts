@@ -87,6 +87,36 @@ test("centraliza, filtra e marca avisos como lidos", async ({ page }) => {
   await expect(page.locator("[data-slot='sidebar-notification-badge']")).toHaveCount(0);
 });
 
+test("pergunta a forma de pagamento antes de concluir um item", async ({ page }) => {
+  await prepararApi(page);
+  let pagamento: Record<string, unknown> | null = null;
+  await page.route("http://localhost:3001/lista/1", async (route) => {
+    if (route.request().method() === "PUT") {
+      pagamento = route.request().postDataJSON();
+      return responderJson(route, { id: 1, nome: "Arroz", quantidade: 2, categoria: "Mercado", valor: 20, comprado: true, movimentacao_id: 99, created_at: new Date().toISOString() });
+    }
+    return route.fallback();
+  });
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/lista");
+
+  await page.getByRole("button", { name: "Marcar Arroz como comprado" }).click();
+  await expect(page.getByRole("heading", { name: "Como você pagou este item?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("button", { name: "Marcar Arroz como comprado" })).toBeVisible();
+  expect(pagamento).toBeNull();
+
+  await page.getByRole("button", { name: "Marcar Arroz como comprado" }).click();
+  await page.getByRole("button", { name: /Cartão de crédito/ }).click();
+  await page.getByLabel("Qual cartão?").selectOption("1");
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  await expect(page.getByText("Compra adicionada à fatura do cartão.")).toBeVisible();
+  expect(pagamento).toEqual({ comprado: true, forma_pagamento: "credito", cartao_id: 1 });
+});
+
 test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) => {
   await prepararApi(page);
   const hoje = new Date();

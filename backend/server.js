@@ -858,6 +858,8 @@ app.post(
             quantidade,
             categoria,
             valor,
+            forma_pagamento,
+            cartao_id,
         } = req.body;
 
         if (
@@ -1134,6 +1136,19 @@ app.put(
                         itemAtualizado.valor
                     ) > 0
                 ) {
+                    const formaPagamento = forma_pagamento === "credito" ? "credito" : "saldo";
+                    const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+                    if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) {
+                        await cliente.query("ROLLBACK");
+                        return res.status(400).json({ mensagem: "Selecione um cartão válido." });
+                    }
+                    if (cartaoId) {
+                        const cartao = await cliente.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                        if (!cartao.rowCount) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
+                        const hoje = new Date();
+                        const bloqueada = await cliente.query("SELECT 1 FROM faturas_cartao WHERE cartao_id = $1 AND ano = $2 AND mes = $3 AND status <> 'aberta'", [cartaoId, hoje.getFullYear(), hoje.getMonth() + 1]);
+                        if (bloqueada.rowCount) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "A fatura atual deste cartão já foi fechada." }); }
+                    }
                     const movimentacao =
                         await cliente.query(
                             `INSERT INTO movimentacoes
@@ -1142,7 +1157,9 @@ app.put(
                                     tipo,
                                     descricao,
                                     valor,
-                                    categoria
+                                    categoria,
+                                    forma_pagamento,
+                                    cartao_id
                                 )
                              VALUES
                                 (
@@ -1150,7 +1167,9 @@ app.put(
                                     'despesa',
                                     $2,
                                     $3,
-                                    $4
+                                    $4,
+                                    $5,
+                                    $6
                                 )
                              RETURNING id`,
                             [
@@ -1159,6 +1178,8 @@ app.put(
                                 itemAtualizado.valor,
                                 itemAtualizado.categoria ||
                                     "Lista de Compras",
+                                formaPagamento,
+                                cartaoId,
                             ]
                         );
 

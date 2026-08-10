@@ -75,7 +75,7 @@ Não inclua senhas, dados bancários ou informações financeiras reais.
 
 - Sugestão: perguntar se o item foi pago com saldo ou cartão ao marcá-lo como comprado.
 - Classificação: melhoria funcional de prioridade alta para o próximo ciclo.
-- Situação: backlog.
+- Situação: implementado em 10/08/2026, com escolha entre saldo e crédito, seleção de cartão e cancelamento sem concluir o item.
 
 ### F08 — Identidade visual dos e-mails — 10/08/2026
 
