@@ -23,7 +23,7 @@ export default function BudgetPanel({ orcamentos, movimentacoes, onSalvar, onRem
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [orcamentoParaExcluir, setOrcamentoParaExcluir] = useState<Orcamento | null>(null);
   const [removendo, setRemovendo] = useState(false);
-  const { categorias } = useCategorias("despesa");
+  const { categorias } = useCategorias("despesa", "planejamento");
 
   async function salvar(event: React.FormEvent) {
     event.preventDefault();

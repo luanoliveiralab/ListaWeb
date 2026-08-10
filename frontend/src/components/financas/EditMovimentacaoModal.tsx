@@ -43,7 +43,7 @@ export default function EditMovimentacaoModal({
     );
     const [formaPagamento, setFormaPagamento] = useState<"saldo" | "credito">(movimentacao?.forma_pagamento ?? "saldo");
     const [cartaoId, setCartaoId] = useState(movimentacao?.cartao_id ? String(movimentacao.cartao_id) : "");
-    const { categorias } = useCategorias(tipo);
+    const { categorias } = useCategorias(tipo, "financas");
 
     const { mostrarAviso } = useToast();
 

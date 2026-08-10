@@ -22,7 +22,7 @@ export default function AddItemForm({
 }: AddItemFormProps) {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const { categorias } = useCategorias("despesa");
+  const { categorias } = useCategorias("despesa", "lista");
 
   function limpar() {
     setItemNome(""); setItemQtd(""); setItemValor(""); setCategoria("");

@@ -87,4 +87,4 @@ Não inclua senhas, dados bancários ou informações financeiras reais.
 
 - Sugestão: permitir escolher se cada categoria aparece em Lista, Finanças e/ou Planejamento.
 - Classificação: melhoria de autonomia de prioridade média-alta.
-- Situação: backlog.
+- Situação: implementado em 10/08/2026 com seleção múltipla para Lista, Finanças e Planejamento, preservando as categorias existentes.

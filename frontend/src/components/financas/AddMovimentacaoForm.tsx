@@ -33,7 +33,7 @@ export default function AddMovimentacaoForm({
 }: Props) {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const { categorias } = useCategorias(tipo);
+  const { categorias } = useCategorias(tipo, "financas");
 
   async function salvar(event: React.FormEvent) {
     event.preventDefault();

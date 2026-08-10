@@ -122,6 +122,9 @@ CREATE TABLE IF NOT EXISTS categorias (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_categorias_usuario_nome_tipo
     ON categorias(usuario_id, LOWER(nome), tipo);
+ALTER TABLE categorias ADD COLUMN IF NOT EXISTS aplica_lista BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE categorias ADD COLUMN IF NOT EXISTS aplica_financas BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE categorias ADD COLUMN IF NOT EXISTS aplica_planejamento BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE TABLE IF NOT EXISTS faturas_cartao (
     id SERIAL PRIMARY KEY,

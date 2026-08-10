@@ -31,7 +31,7 @@ export default function EditItemModal({
     );
 
     const { mostrarAviso } = useToast();
-    const { categorias } = useCategorias("despesa");
+    const { categorias } = useCategorias("despesa", "lista");
 
     if (!aberto || !item) return null;
 

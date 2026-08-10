@@ -17,7 +17,13 @@ function validar(body) {
     if (!nome || nome.length > 80 || !["receita", "despesa"].includes(tipo)) {
         throw new HttpError(400, "Dados da categoria inválidos.", "CATEGORIA_INVALIDA");
     }
-    return { nome, tipo };
+    const aplica_lista = body?.aplica_lista !== false;
+    const aplica_financas = body?.aplica_financas !== false;
+    const aplica_planejamento = body?.aplica_planejamento !== false;
+    if (![aplica_lista, aplica_financas, aplica_planejamento].some(Boolean)) {
+        throw new HttpError(400, "Escolha ao menos uma página para a categoria.", "CATEGORIA_SEM_PAGINA");
+    }
+    return { nome, tipo, aplica_lista, aplica_financas, aplica_planejamento };
 }
 
 async function garantirPadroes(usuarioId) {
@@ -35,18 +41,18 @@ async function garantirPadroes(usuarioId) {
 router.get("/", asyncHandler(async (req, res) => {
     await garantirPadroes(req.usuarioId);
     const result = await pool.query(
-        "SELECT id, nome, tipo, created_at, updated_at FROM categorias WHERE usuario_id = $1 ORDER BY tipo DESC, nome",
+        "SELECT id, nome, tipo, aplica_lista, aplica_financas, aplica_planejamento, created_at, updated_at FROM categorias WHERE usuario_id = $1 ORDER BY tipo DESC, nome",
         [req.usuarioId]
     );
     return res.json(result.rows);
 }));
 
 router.post("/", asyncHandler(async (req, res) => {
-    const { nome, tipo } = validar(req.body);
+    const { nome, tipo, aplica_lista, aplica_financas, aplica_planejamento } = validar(req.body);
     try {
         const result = await pool.query(
-            "INSERT INTO categorias (usuario_id, nome, tipo) VALUES ($1,$2,$3) RETURNING id, nome, tipo, created_at, updated_at",
-            [req.usuarioId, nome, tipo]
+            "INSERT INTO categorias (usuario_id, nome, tipo, aplica_lista, aplica_financas, aplica_planejamento) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, nome, tipo, aplica_lista, aplica_financas, aplica_planejamento, created_at, updated_at",
+            [req.usuarioId, nome, tipo, aplica_lista, aplica_financas, aplica_planejamento]
         );
         return res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -57,7 +63,7 @@ router.post("/", asyncHandler(async (req, res) => {
 
 router.put("/:id", asyncHandler(async (req, res) => {
     const id = idPositivo(req.params.id, "ID da categoria");
-    const { nome, tipo } = validar(req.body);
+    const { nome, tipo, aplica_lista, aplica_financas, aplica_planejamento } = validar(req.body);
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -65,8 +71,8 @@ router.put("/:id", asyncHandler(async (req, res) => {
         if (!atual.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ mensagem: "Categoria não encontrada." }); }
         const anterior = atual.rows[0];
         const result = await client.query(
-            "UPDATE categorias SET nome = $1, tipo = $2, updated_at = NOW() WHERE id = $3 RETURNING id, nome, tipo, created_at, updated_at",
-            [nome, tipo, id]
+            "UPDATE categorias SET nome = $1, tipo = $2, aplica_lista = $3, aplica_financas = $4, aplica_planejamento = $5, updated_at = NOW() WHERE id = $6 RETURNING id, nome, tipo, aplica_lista, aplica_financas, aplica_planejamento, created_at, updated_at",
+            [nome, tipo, aplica_lista, aplica_financas, aplica_planejamento, id]
         );
         if (anterior.nome !== nome) {
             for (const tabela of ["movimentacoes", "recorrencias"]) {
@@ -95,3 +101,4 @@ router.delete("/:id", asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.validarCategoria = validar;

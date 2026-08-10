@@ -22,7 +22,7 @@ export async function prepararApi(page: Page) {
     if (pathname === "/recorrencias") return responderJson(route, [{ id: 1, tipo: "despesa", descricao: "Aluguel", valor: 1200, categoria: "Moradia", dia: 5, ativa: true }]);
     if (pathname === "/metas") return responderJson(route, [{ id: 1, nome: "Reserva", valor_alvo: 10000, valor_atual: 1500, prazo: null, concluida: false }]);
     if (pathname === "/lista/42") return responderJson(route, [{ id: 1, nome: "Arroz", quantidade: 2, categoria: "Mercado", valor: 20, comprado: false, movimentacao_id: null, created_at: new Date().toISOString() }]);
-    if (pathname === "/categorias") return responderJson(route, [{ id: 1, nome: "Mercado", tipo: "despesa", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { id: 2, nome: "Salário", tipo: "receita", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+    if (pathname === "/categorias") return responderJson(route, [{ id: 1, nome: "Mercado", tipo: "despesa", aplica_lista: true, aplica_financas: true, aplica_planejamento: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { id: 2, nome: "Salário", tipo: "receita", aplica_lista: false, aplica_financas: true, aplica_planejamento: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (pathname === "/csrf") return responderJson(route, { csrfToken: "csrf-teste" });
     return responderJson(route, { mensagem: "API de teste" });
   });

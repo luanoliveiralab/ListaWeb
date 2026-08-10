@@ -27,7 +27,7 @@ export default function PlanejamentoPage() {
   const { mes, ano, setMes, setAno } = usePeriod();
   const queryClient = useQueryClient();
   const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
-  const { categorias } = useCategorias(rec.tipo as "receita" | "despesa");
+  const { categorias } = useCategorias(rec.tipo as "receita" | "despesa", "planejamento");
   const [meta, setMeta] = useState({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [historico, setHistorico] = useState<MetaMovimentacao[]>([]);

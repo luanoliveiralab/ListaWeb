@@ -151,11 +151,31 @@ test("mantém header e formulário fixos enquanto apenas categorias rolam", asyn
   await page.getByRole("button", { name: "Editar Mercado" }).click();
   await expect(page.getByText("Despesas e compras")).toBeVisible();
   await expect(page.getByText("Editando categoria")).toBeVisible();
+  await expect(page.getByLabel("Lista de Compras")).toBeChecked();
+  await expect(page.getByLabel("Finanças")).toBeChecked();
+  await expect(page.getByLabel("Planejamento")).toBeChecked();
   await page.getByRole("button", { name: "Excluir Mercado" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sim, excluir categoria" })).toBeVisible();
   await page.getByRole("button", { name: "Cancelar" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).not.toBeVisible();
+});
+
+test("exibe em cada página somente as categorias configuradas", async ({ page }) => {
+  await prepararApi(page);
+  await page.route("http://localhost:3001/categorias", (route) => responderJson(route, [
+    { id: 1, nome: "Mercado", tipo: "despesa", aplica_lista: false, aplica_financas: true, aplica_planejamento: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 3, nome: "Pets", tipo: "despesa", aplica_lista: true, aplica_financas: false, aplica_planejamento: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  ]));
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/lista");
+  await page.getByRole("button", { name: "Criar novo item" }).click();
+  const categoriasLista = page.locator("form select").first();
+  await expect(categoriasLista.locator("option")).toContainText(["Selecionar categoria", "Pets"]);
+  await expect(categoriasLista.locator("option", { hasText: "Mercado" })).toHaveCount(0);
 });
 
 test("solicita confirmação visual nas exclusões financeiras e de planejamento", async ({ page }) => {
