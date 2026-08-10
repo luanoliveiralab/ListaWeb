@@ -46,7 +46,7 @@ function lerCookies(req) {
 }
 
 function protegerCsrf(req, res, next) {
-    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || ["/login", "/cadastro"].includes(req.path)) {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || ["/login", "/cadastro", "/verificar-email"].includes(req.path)) {
         return next();
     }
 

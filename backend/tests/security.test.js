@@ -44,3 +44,10 @@ test("aceita alteração com token CSRF correspondente", () => {
     protegerCsrf(req, {}, () => { prosseguiu = true; });
     assert.equal(prosseguiu, true);
 });
+
+test("permite confirmar e-mail sem uma sessão prévia", () => {
+    const req = { method: "POST", path: "/verificar-email", headers: {} };
+    let prosseguiu = false;
+    protegerCsrf(req, {}, () => { prosseguiu = true; });
+    assert.equal(prosseguiu, true);
+});
