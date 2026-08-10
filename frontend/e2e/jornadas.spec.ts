@@ -80,3 +80,21 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await expect(page.getByText("Crédito disponível")).toBeVisible();
   await expect(page.getByRole("link", { name: /Finanças/ })).toBeVisible();
 });
+
+test("mantém header e formulário fixos enquanto apenas categorias rolam", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/configuracoes");
+  await page.getByRole("button", { name: "Gerenciar categorias" }).click();
+
+  const modal = page.getByTestId("categorias-modal");
+  const lista = page.getByTestId("categorias-lista");
+  await expect(modal).toHaveCSS("overflow-y", "hidden");
+  await expect(lista).toHaveCSS("overflow-y", "auto");
+  await page.getByRole("button", { name: "Editar Mercado" }).click();
+  await expect(page.getByText("Despesas e compras")).toBeVisible();
+  await expect(page.getByText("Editando categoria")).toBeVisible();
+});
