@@ -146,11 +146,19 @@ export default function FinancasPage() {
         limite_disponivel: number;
         dia_vencimento: number;
     }) {
+        const temporario: Cartao = {
+            id: -Date.now(),
+            usuario_id: usuario?.id ?? 0,
+            ...dados,
+            created_at: new Date().toISOString(),
+        };
+        setCartoes((atuais) => [temporario, ...atuais]);
         try {
             const novo = await cartoesService.adicionar(dados);
-            setCartoes((atuais) => [novo, ...atuais]);
+            setCartoes((atuais) => atuais.map((cartao) => cartao.id === temporario.id ? novo : cartao));
             mostrarAviso("Cartão adicionado com sucesso!");
         } catch (err) {
+            setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== temporario.id));
             console.error(err);
             mostrarAviso("Não foi possível adicionar o cartão.", "erro");
             throw err;
@@ -158,11 +166,13 @@ export default function FinancasPage() {
     }
 
     async function removerCartao(id: number) {
+        const removido = cartoes.find((cartao) => cartao.id === id);
+        setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== id));
         try {
             await cartoesService.remover(id);
-            setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== id));
             mostrarAviso("Cartão removido.");
         } catch (err) {
+            if (removido) setCartoes((atuais) => [removido, ...atuais]);
             console.error(err);
             mostrarAviso("Não foi possível remover o cartão.", "erro");
         }
@@ -185,6 +195,30 @@ export default function FinancasPage() {
             return false;
         }
 
+        const formaFinal = tipo === "despesa" ? formaPagamento : "saldo";
+        const cartaoFinal = tipo === "despesa" && formaPagamento === "credito" ? Number(cartaoId) : null;
+        const temporaria: Movimentacao = {
+            id: -Date.now(),
+            usuario_id: usuario.id,
+            tipo,
+            descricao: descricao.trim(),
+            valor: valorNumero,
+            categoria,
+            data,
+            created_at: new Date().toISOString(),
+            forma_pagamento: formaFinal,
+            cartao_id: cartaoFinal,
+            cartao_nome: cartaoFinal ? cartoes.find((cartao) => cartao.id === cartaoFinal)?.nome ?? null : null,
+        };
+        setMovimentacoes((prev) => [temporaria, ...prev]);
+        setTipo("receita");
+        setDescricao("");
+        setValor("");
+        setCategoria("");
+        setFormaPagamento("saldo");
+        setCartaoId("");
+        setData(new Date().toISOString().split("T")[0]);
+
         try {
             const nova = await financasService.adicionar({
                 usuario_id: usuario.id,
@@ -193,23 +227,16 @@ export default function FinancasPage() {
                 valor: valorNumero,
                 categoria,
                 data,
-                forma_pagamento: tipo === "despesa" ? formaPagamento : "saldo",
-                cartao_id: tipo === "despesa" && formaPagamento === "credito" ? Number(cartaoId) : null,
+                forma_pagamento: formaFinal,
+                cartao_id: cartaoFinal,
             });
 
-            setMovimentacoes((prev) => [nova, ...prev]);
-
-            setTipo("receita");
-            setDescricao("");
-            setValor("");
-            setCategoria("");
-            setFormaPagamento("saldo");
-            setCartaoId("");
-            setData(new Date().toISOString().split("T")[0]);
+            setMovimentacoes((prev) => prev.map((mov) => mov.id === temporaria.id ? nova : mov));
 
             mostrarAviso("Movimentação adicionada com sucesso!");
             return true;
         } catch (err) {
+            setMovimentacoes((prev) => prev.filter((mov) => mov.id !== temporaria.id));
             console.error(err);
             mostrarAviso("Erro ao adicionar movimentação.", "erro");
             return false;
@@ -226,15 +253,13 @@ export default function FinancasPage() {
     }
 
     async function excluirMovimentacao(id: number) {
-
+        const removida = movimentacoes.find((mov) => mov.id === id);
+        setMovimentacoes((prev) => prev.filter((mov) => mov.id !== id));
         try {
             await financasService.remover(id);
-
-            setMovimentacoes((prev) =>
-                prev.filter((mov) => mov.id !== id)
-            );
             mostrarAviso("Movimentação excluída com sucesso!");
         } catch (err) {
+            if (removida) setMovimentacoes((prev) => [removida, ...prev]);
             console.error(err);
             mostrarAviso("Erro ao excluir movimentação.", "erro");
         }
@@ -244,6 +269,10 @@ export default function FinancasPage() {
     // EDITAR
     // =========================
     async function salvarEdicao(mov: Movimentacao) {
+        const anterior = movimentacoes.find((item) => item.id === mov.id);
+        setMovimentacoes((prev) => prev.map((item) => item.id === mov.id ? mov : item));
+        setModalAberto(false);
+        setMovimentacaoEditando(null);
         try {
             const atualizada = await financasService.atualizar(mov.id, {
                 tipo: mov.tipo,
@@ -261,10 +290,9 @@ export default function FinancasPage() {
                 )
             );
 
-            setModalAberto(false);
-            setMovimentacaoEditando(null);
             mostrarAviso("Movimentação atualizada com sucesso!");
         } catch (err) {
+            if (anterior) setMovimentacoes((prev) => prev.map((item) => item.id === anterior.id ? anterior : item));
             console.error(err);
             mostrarAviso("Erro ao atualizar movimentação.", "erro");
         }
