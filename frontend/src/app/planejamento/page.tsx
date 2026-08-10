@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, CheckCircle2, Pause, Play, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useUsuario } from "@/hooks/useUsuario";
@@ -22,10 +23,7 @@ export default function PlanejamentoPage() {
   const { usuario } = useUsuario();
   const { mostrarAviso } = useToast();
   const { mes, ano, setMes, setAno } = usePeriod();
-  const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
-  const [metas, setMetas] = useState<Meta[]>([]);
-  const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
-  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
+  const queryClient = useQueryClient();
   const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
   const [meta, setMeta] = useState({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
@@ -33,93 +31,41 @@ export default function PlanejamentoPage() {
   const [movimento, setMovimento] = useState({ tipo: "deposito", valor: "", observacao: "" });
   const [recorrenciaAberta, setRecorrenciaAberta] = useState(false);
   const [metaAberta, setMetaAberta] = useState(false);
-  const planejamentoCarregadoRef = useRef("");
-  const periodoCarregadoRef = useRef("");
+  const recorrenciasKey = ["recorrencias", usuario?.id] as const;
+  const metasKey = ["metas", usuario?.id] as const;
+  const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
+  const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
+  const recorrenciasQuery = useQuery<Recorrencia[]>({ queryKey: recorrenciasKey, queryFn: planejamentoService.buscarRecorrencias, enabled: Boolean(usuario?.id) });
+  const metasQuery = useQuery<Meta[]>({ queryKey: metasKey, queryFn: planejamentoService.buscarMetas, enabled: Boolean(usuario?.id) });
+  const orcamentosQuery = useQuery<Orcamento[]>({ queryKey: orcamentosKey, queryFn: () => orcamentosService.buscar(usuario!.id, mes, ano), enabled: Boolean(usuario?.id) });
+  const movimentacoesQuery = useQuery<Movimentacao[]>({ queryKey: movimentacoesKey, queryFn: async () => (await planejamentoService.gerarRecorrencias(mes, ano)).movimentacoes, enabled: Boolean(usuario?.id) });
+  const recorrencias = recorrenciasQuery.data ?? [];
+  const metas = metasQuery.data ?? [];
+  const orcamentos = orcamentosQuery.data ?? [];
+  const movimentacoes = movimentacoesQuery.data ?? [];
+  const erroCarregamento = recorrenciasQuery.error || metasQuery.error || orcamentosQuery.error || movimentacoesQuery.error;
 
   useEffect(() => {
-    if (!usuario) return;
-    async function carregarPlanejamento() {
-      const cacheKey = `planejamento:${usuario!.id}`;
-      const cache = sessionStorage.getItem(cacheKey);
-      if (cache) {
-        try {
-          const dados = JSON.parse(cache) as { recorrencias: Recorrencia[]; metas: Meta[] };
-          setRecorrencias(dados.recorrencias);
-          setMetas(dados.metas);
-          planejamentoCarregadoRef.current = cacheKey;
-        } catch {
-          sessionStorage.removeItem(cacheKey);
-        }
-      }
+    if (erroCarregamento) mostrarAviso("Não foi possível carregar o planejamento.", "erro");
+  }, [erroCarregamento, mostrarAviso]);
 
-      try {
-        const [listaRecorrencias, listaMetas] = await Promise.all([
-          planejamentoService.buscarRecorrencias(),
-          planejamentoService.buscarMetas(),
-        ]);
-        setRecorrencias(listaRecorrencias);
-        setMetas(listaMetas);
-        planejamentoCarregadoRef.current = cacheKey;
-        sessionStorage.setItem(cacheKey, JSON.stringify({ recorrencias: listaRecorrencias, metas: listaMetas }));
-      } catch {
-        mostrarAviso("Não foi possível carregar o planejamento.", "erro");
-      }
-    }
-
-    carregarPlanejamento();
-  }, [mostrarAviso, usuario]);
-
-  useEffect(() => {
-    const cacheKey = usuario?.id ? `planejamento:${usuario.id}` : "";
-    if (cacheKey && planejamentoCarregadoRef.current === cacheKey) {
-      sessionStorage.setItem(cacheKey, JSON.stringify({ recorrencias, metas }));
-    }
-  }, [metas, recorrencias, usuario?.id]);
-
-  useEffect(() => {
-    if (!usuario?.id) return;
-
-    async function carregarPeriodo() {
-      const cacheKey = `planejamento-periodo:${usuario!.id}:${ano}-${mes}`;
-      const cache = sessionStorage.getItem(cacheKey);
-      if (cache) {
-        try {
-          const dados = JSON.parse(cache) as { orcamentos: Orcamento[]; movimentacoes: Movimentacao[] };
-          setOrcamentos(dados.orcamentos);
-          setMovimentacoes(dados.movimentacoes);
-          periodoCarregadoRef.current = cacheKey;
-        } catch {
-          sessionStorage.removeItem(cacheKey);
-        }
-      }
-
-      try {
-        const [listaOrcamentos, resposta] = await Promise.all([
-          orcamentosService.buscar(usuario!.id, mes, ano),
-          planejamentoService.gerarRecorrencias(mes, ano),
-        ]);
-        setOrcamentos(listaOrcamentos);
-        setMovimentacoes(resposta.movimentacoes);
-        periodoCarregadoRef.current = cacheKey;
-        sessionStorage.setItem(cacheKey, JSON.stringify({ orcamentos: listaOrcamentos, movimentacoes: resposta.movimentacoes }));
-      } catch {
-        mostrarAviso("Não foi possível carregar os orçamentos.", "erro");
-      }
-    }
-
-    carregarPeriodo();
-  }, [ano, mes, mostrarAviso, usuario]);
-
-  useEffect(() => {
-    const cacheKey = usuario?.id ? `planejamento-periodo:${usuario.id}:${ano}-${mes}` : "";
-    if (cacheKey && periodoCarregadoRef.current === cacheKey) {
-      sessionStorage.setItem(cacheKey, JSON.stringify({ orcamentos, movimentacoes }));
-    }
-  }, [ano, mes, movimentacoes, orcamentos, usuario?.id]);
+  function atualizarRecorrencias(atualizar: (atuais: Recorrencia[]) => Recorrencia[]) {
+    queryClient.setQueryData<Recorrencia[]>(recorrenciasKey, (atuais = []) => atualizar(atuais));
+  }
+  function atualizarMetas(atualizar: (atuais: Meta[]) => Meta[]) {
+    queryClient.setQueryData<Meta[]>(metasKey, (atuais = []) => atualizar(atuais));
+  }
+  function atualizarOrcamentos(atualizar: (atuais: Orcamento[]) => Orcamento[]) {
+    queryClient.setQueryData<Orcamento[]>(orcamentosKey, (atuais = []) => atualizar(atuais));
+  }
+  function sincronizarFinancas() {
+    queryClient.invalidateQueries({ queryKey: ["financas", usuario?.id] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard", usuario?.id] });
+  }
 
   async function salvarOrcamento(categoriaOrcamento: string, valorOrcamento: number) {
     const salvo = await orcamentosService.salvar({ categoria: categoriaOrcamento, valor: valorOrcamento, mes, ano });
-    setOrcamentos((atuais) => {
+    atualizarOrcamentos((atuais) => {
       const existe = atuais.some((item) => item.id === salvo.id);
       return existe
         ? atuais.map((item) => item.id === salvo.id ? salvo : item)
@@ -130,7 +76,7 @@ export default function PlanejamentoPage() {
 
   async function removerOrcamento(id: number) {
     await orcamentosService.remover(id);
-    setOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
+    atualizarOrcamentos((atuais) => atuais.filter((item) => item.id !== id));
     mostrarAviso("Orçamento removido.");
   }
 
@@ -138,7 +84,8 @@ export default function PlanejamentoPage() {
     event.preventDefault();
     try {
       const nova = await planejamentoService.criarRecorrencia({ ...rec, valor: Number(rec.valor.replace(",", ".")), dia: Number(rec.dia) });
-      setRecorrencias((itens) => [nova, ...itens]);
+      atualizarRecorrencias((itens) => [nova, ...itens]);
+      sincronizarFinancas();
       setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
       setRecorrenciaAberta(false);
       mostrarAviso("Recorrência criada.");
@@ -151,7 +98,7 @@ export default function PlanejamentoPage() {
     event.preventDefault();
     try {
       const nova = await planejamentoService.criarMeta({ nome: meta.nome.trim(), valor_alvo: numeroMoeda(meta.valor_alvo), valor_atual: meta.valor_atual ? numeroMoeda(meta.valor_atual) : 0, prazo: meta.prazo || null });
-      setMetas((itens) => [nova, ...itens]);
+      atualizarMetas((itens) => [nova, ...itens]);
       setMeta({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
       setMetaAberta(false);
       mostrarAviso("Meta criada.");
@@ -172,7 +119,7 @@ export default function PlanejamentoPage() {
     if (!metaSelecionada) return;
     try {
       const resposta = await planejamentoService.movimentarMeta(metaSelecionada.id, { ...movimento, valor: Number(movimento.valor.replace(",", ".")) });
-      setMetas((lista) => lista.map((item) => item.id === resposta.meta.id ? resposta.meta : item));
+      atualizarMetas((lista) => lista.map((item) => item.id === resposta.meta.id ? resposta.meta : item));
       setMetaSelecionada(resposta.meta);
       setHistorico((lista) => [resposta.movimentacao, ...lista]);
       setMovimento({ tipo: "deposito", valor: "", observacao: "" });
@@ -229,7 +176,7 @@ export default function PlanejamentoPage() {
                 <span className={`planning-kind ${item.tipo}`}><TipoIcon size={18} /></span>
                 <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{item.descricao}</strong><span className={`status-pill ${item.ativa ? "active" : "paused"}`}>{item.ativa ? "Ativa" : "Pausada"}</span></div><p className="planning-detail">{item.categoria} <span>•</span> todo dia {item.dia}</p></div>
                 <strong className={item.tipo === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{item.tipo === "receita" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong>
-                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); setRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label="Excluir recorrência" onClick={async () => { await planejamentoService.removerRecorrencia(item.id); setRecorrencias((lista) => lista.filter((r) => r.id !== item.id)); }}><Trash2 size={17} /></button></div>
+                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label="Excluir recorrência" onClick={async () => { await planejamentoService.removerRecorrencia(item.id); atualizarRecorrencias((lista) => lista.filter((r) => r.id !== item.id)); sincronizarFinancas(); }}><Trash2 size={17} /></button></div>
               </article>;
             })}
             {!recorrencias.length && <p className="empty-state">Nenhuma recorrência cadastrada.</p>}
@@ -253,7 +200,7 @@ export default function PlanejamentoPage() {
             {metas.map((item) => {
               const progresso = Math.min(100, Math.round(Number(item.valor_atual) / Number(item.valor_alvo) * 100));
               return <article key={item.id} className="planning-goal">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label="Excluir meta" onClick={async () => { await planejamentoService.removerMeta(item.id); setMetas((lista) => lista.filter((m) => m.id !== item.id)); }}><Trash2 size={17} /></button></div>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label="Excluir meta" onClick={async () => { await planejamentoService.removerMeta(item.id); atualizarMetas((lista) => lista.filter((m) => m.id !== item.id)); }}><Trash2 size={17} /></button></div>
                 <div className="mt-4 flex items-end justify-between gap-3"><div><span className="text-xs text-muted-foreground">Valor acumulado</span><p className="font-semibold">{moeda.format(Number(item.valor_atual))} <span className="text-sm font-normal text-muted-foreground">de {moeda.format(Number(item.valor_alvo))}</span></p></div><strong className="text-primary">{progresso}%</strong></div>
                 <div className="progress-track" aria-label={`${progresso}% concluído`}><span style={{ width: `${progresso}%` }} /></div>
                 <button type="button" className="button-secondary mt-3 w-full" onClick={() => abrirMeta(item)}>Movimentar e ver histórico</button>
