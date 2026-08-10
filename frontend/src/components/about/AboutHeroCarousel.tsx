@@ -38,7 +38,7 @@ export default function AboutHeroCarousel() {
   }
 
   return (
-    <section className="relative mt-8 overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-12 shadow-sm sm:px-12 sm:py-16">
+    <section data-scroll-reveal className="relative mt-8 overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-12 shadow-sm sm:px-12 sm:py-16">
       <div className="absolute -right-20 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative max-w-4xl">
         <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">

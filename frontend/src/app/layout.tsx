@@ -7,6 +7,7 @@ import { PeriodProvider } from "@/context/PeriodContext";
 
 import { ToastProvider } from "@/providers/ToastProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ScrollRevealProvider } from "@/providers/ScrollRevealProvider";
 
 export const metadata: Metadata = {
   title: "ListaWeb",
@@ -34,6 +35,7 @@ export default function RootLayout({
           <QueryProvider>
             <ToastProvider>
               <PeriodProvider>
+                <ScrollRevealProvider />
                 {children}
               </PeriodProvider>
             </ToastProvider>
