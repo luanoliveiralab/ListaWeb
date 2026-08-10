@@ -41,7 +41,7 @@ export default function RecentMovimentacoes({ movimentacoes }: Props) {
                     {mov.categoria} · {new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
-                <strong className={`shrink-0 tabular-nums ${receita ? "text-emerald-600" : "text-rose-600"}`}>
+                <strong className={`shrink-0 tabular-nums ${receita ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>
                   {receita ? "+" : "−"} {Number(mov.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </strong>
               </div>

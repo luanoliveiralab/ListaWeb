@@ -45,7 +45,7 @@ export default function ConfiguracoesPage() {
                 </p>
               </div>
             </div>
-            <Switch checked={temaEscuro} onCheckedChange={alterarTema} />
+            <Switch aria-label="Ativar modo escuro" checked={temaEscuro} onCheckedChange={alterarTema} />
           </div>
         </div>
       </section>

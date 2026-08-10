@@ -39,11 +39,12 @@ export default function PeriodSelector({
     return (
         <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-2">
-                <label className="font-medium">
+                <label className="font-medium" htmlFor="periodo-mes">
                     Mês
                 </label>
 
                 <select
+                    id="periodo-mes"
                     value={mes}
                     onChange={(e) => onMesChange(Number(e.target.value))}
                     className="rounded-xl border border-border bg-background px-4 py-3 outline-none transition focus:ring-2 focus:ring-primary"
@@ -60,11 +61,12 @@ export default function PeriodSelector({
             </div>
 
             <div className="flex items-center gap-2">
-                <label className="font-medium">
+                <label className="font-medium" htmlFor="periodo-ano">
                     Ano
                 </label>
 
                 <select
+                    id="periodo-ano"
                     value={ano}
                     onChange={(e) => onAnoChange(Number(e.target.value))}
                     className="rounded-xl border border-border bg-background px-4 py-3 outline-none transition focus:ring-2 focus:ring-primary"

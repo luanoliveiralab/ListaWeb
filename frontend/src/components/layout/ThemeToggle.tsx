@@ -9,7 +9,9 @@ export default function ThemeToggle() {
 
     return (
         <button
+            type="button"
             onClick={() => alterarTema(!temaEscuro)}
+            aria-label={temaEscuro ? "Ativar tema claro" : "Ativar tema escuro"}
             className="rounded-lg border border-border bg-card p-2 shadow-sm transition-all hover:scale-105 hover:bg-accent"
         >
             {temaEscuro ? (

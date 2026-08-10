@@ -55,3 +55,16 @@ Marque cada cenário como `Aprovado`, `Falhou` ou `Precisa melhorar`.
 |---|---|---|---|---|---|
 |  |  |  |  |  |  |
 
+## Validação técnica — 10/08/2026
+
+Enquanto os testadores convidados não estavam disponíveis, foi executada a etapa técnica da primeira rodada:
+
+- produção e comunicação com o banco verificadas;
+- 19 testes do servidor aprovados;
+- 20 jornadas de interface aprovadas em desktop e mobile;
+- navegação por teclado e fechamento de confirmações com `Esc` aprovados;
+- nenhuma violação de acessibilidade grave ou crítica nas telas auditadas;
+- nomes acessíveis adicionados ao botão de tema, seletor de período e controle de modo escuro;
+- contraste do valor positivo no histórico aprimorado.
+
+Resultado: **etapa técnica aprovada**. A aprovação final da rodada continua dependendo da execução dos cenários obrigatórios pelos testadores convidados.
