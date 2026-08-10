@@ -15,6 +15,8 @@ test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page 
   await page.goto("/sobre");
   await expect(page.getByRole("heading", { name: /Mais clareza/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Etapas do projeto" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Foto de Luan Oliveira" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "LinkedIn" })).toHaveAttribute("href", "https://www.linkedin.com/in/luanoliveira-ld");
   await expect(page.getByRole("heading", { name: "É 100% gratuito?" })).toBeVisible();
 });
 
