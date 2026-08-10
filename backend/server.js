@@ -1415,10 +1415,12 @@ app.get(
                 await pool.query(
                     `SELECT
                         m.*,
-                        l.quantidade AS quantidade
+                        l.quantidade AS quantidade,
+                        c.nome AS cartao_nome
                      FROM movimentacoes m
                      LEFT JOIN listas l
                         ON l.movimentacao_id = m.id
+                     LEFT JOIN cartoes c ON c.id = m.cartao_id
                      WHERE m.usuario_id = $1
                      ORDER BY
                         m.data DESC,
@@ -1457,6 +1459,8 @@ app.post(
             valor,
             categoria,
             data,
+            forma_pagamento,
+            cartao_id,
         } = req.body;
 
         if (
@@ -1479,7 +1483,19 @@ app.post(
             });
         }
 
+        const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
+        const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+        if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) {
+            return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
+        }
+
         try {
+            let cartaoNome = null;
+            if (cartaoId) {
+                const cartao = await pool.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                if (!cartao.rowCount) return res.status(400).json({ mensagem: "Cartão inválido." });
+                cartaoNome = cartao.rows[0].nome;
+            }
             const result =
                 await pool.query(
                     `INSERT INTO movimentacoes
@@ -1489,7 +1505,9 @@ app.post(
                             descricao,
                             valor,
                             categoria,
-                            data
+                            data,
+                            forma_pagamento,
+                            cartao_id
                         )
                      VALUES
                         (
@@ -1501,7 +1519,9 @@ app.post(
                             COALESCE(
                                 $6,
                                 CURRENT_DATE
-                            )
+                            ),
+                            $7,
+                            $8
                         )
                      RETURNING *`,
                     [
@@ -1511,8 +1531,12 @@ app.post(
                         valor,
                         categoria.trim(),
                         data || null,
+                        formaPagamento,
+                        cartaoId,
                     ]
                 );
+
+            result.rows[0].cartao_nome = cartaoNome;
 
             return res
                 .status(201)
@@ -1565,6 +1589,8 @@ app.put(
             categoria,
             data,
             quantidade,
+            forma_pagamento,
+            cartao_id,
         } = req.body;
 
         // =================================================
@@ -1702,6 +1728,20 @@ app.put(
                 });
             }
 
+            const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
+            const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+            if (formaPagamento === "credito") {
+                if (!Number.isInteger(cartaoId) || cartaoId <= 0) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
+                }
+                const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+                if (!cartao.rowCount) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ mensagem: "Cartão inválido." });
+                }
+            }
+
             // =================================================
             // ATUALIZAR MOVIMENTAÇÃO
             // =================================================
@@ -1713,8 +1753,10 @@ app.put(
                          descricao = $2,
                          valor = $3,
                          categoria = $4,
-                         data = $5
-                     WHERE id = $6
+                         data = $5,
+                         forma_pagamento = $6,
+                         cartao_id = $7
+                     WHERE id = $8
                      RETURNING *`,
                     [
                         tipo,
@@ -1722,6 +1764,8 @@ app.put(
                         valor,
                         categoria.trim(),
                         data,
+                        formaPagamento,
+                        cartaoId,
                         movimentacaoId,
                     ]
                 );
@@ -1791,10 +1835,12 @@ app.put(
                 await client.query(
                     `SELECT
                         m.*,
-                        l.quantidade AS quantidade
+                        l.quantidade AS quantidade,
+                        c.nome AS cartao_nome
                      FROM movimentacoes m
                      LEFT JOIN listas l
                         ON l.movimentacao_id = m.id
+                     LEFT JOIN cartoes c ON c.id = m.cartao_id
                      WHERE m.id = $1`,
                     [movimentacaoId]
                 );

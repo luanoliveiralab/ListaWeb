@@ -112,6 +112,11 @@ CREATE TABLE IF NOT EXISTS cartoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS forma_pagamento
+    VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS cartao_id
+    INTEGER REFERENCES cartoes(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
     ON movimentacoes(usuario_id, data DESC);
 CREATE INDEX IF NOT EXISTS idx_listas_usuario
@@ -124,5 +129,6 @@ CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario ON recuperacoes_senha(
 CREATE INDEX IF NOT EXISTS idx_verificacoes_email_usuario ON verificacoes_email(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_meta_movimentacoes_meta ON meta_movimentacoes(meta_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao_id, data DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

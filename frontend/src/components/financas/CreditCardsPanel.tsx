@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Building2, CreditCard, Plus, Trash2, Wifi } from "lucide-react";
 
 import type { Cartao } from "@/types/Cartao";
+import type { Movimentacao } from "@/types/Movimentacao";
 
 interface Props {
   cartoes: Cartao[];
   carregando?: boolean;
+  movimentacoes: Movimentacao[];
   onAdicionar: (dados: {
     nome: string;
     instituicao: string;
@@ -39,7 +41,7 @@ const estilos: Record<string, { fundo: string; sigla: string }> = {
 const padrao = { fundo: "from-slate-600 via-slate-700 to-slate-900", sigla: "CARD" };
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function CreditCardsPanel({ cartoes, carregando, onAdicionar, onRemover }: Props) {
+export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, onAdicionar, onRemover }: Props) {
   const [nome, setNome] = useState("");
   const [instituicao, setInstituicao] = useState("");
   const [outraInstituicao, setOutraInstituicao] = useState("");
@@ -130,6 +132,12 @@ export default function CreditCardsPanel({ cartoes, carregando, onAdicionar, onR
         <div className="grid gap-5 p-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 sm:p-6">
           {cartoes.map((cartao) => {
             const estilo = estilos[cartao.instituicao] ?? { ...padrao, sigla: cartao.instituicao };
+            const fatura = movimentacoes
+              .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito" && Number(mov.cartao_id) === cartao.id)
+              .reduce((total, mov) => total + Number(mov.valor), 0);
+            const limite = Number(cartao.limite_disponivel);
+            const disponivel = Math.max(limite - fatura, 0);
+            const uso = limite > 0 ? Math.min((fatura / limite) * 100, 100) : 0;
             return (
               <article key={cartao.id} className={`relative aspect-[1.586/1] min-h-48 overflow-hidden rounded-[1.4rem] bg-gradient-to-br ${estilo.fundo} p-5 text-white shadow-lg transition duration-200 hover:-translate-y-1 hover:shadow-xl`}>
                 <div className="absolute -right-12 -top-16 size-44 rounded-full bg-white/10" />
@@ -140,9 +148,12 @@ export default function CreditCardsPanel({ cartoes, carregando, onAdicionar, onR
                     <button type="button" onClick={() => remover(cartao.id)} disabled={removendo === cartao.id} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Excluir ${cartao.nome}`}><Trash2 size={16} /></button>
                   </div>
                   <div className="flex items-center gap-3"><span className="h-8 w-10 rounded-md bg-gradient-to-br from-yellow-200 to-amber-400 shadow-inner" /><Wifi className="rotate-90 text-white/80" size={20} /></div>
-                  <div className="flex items-end justify-between gap-4">
-                    <div><p className="text-[10px] uppercase tracking-widest text-white/65">Limite disponível</p><p className="mt-0.5 text-lg font-semibold">{moeda.format(Number(cartao.limite_disponivel))}</p></div>
-                    <div className="text-right"><p className="text-[10px] uppercase tracking-widest text-white/65">Vence</p><p className="font-semibold">Dia {cartao.dia_vencimento}</p></div>
+                  <div>
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-white/80 transition-[width]" style={{ width: `${uso}%` }} /></div>
+                    <div className="flex items-end justify-between gap-3">
+                      <div><p className="text-[10px] uppercase tracking-widest text-white/65">Fatura atual</p><p className="mt-0.5 text-lg font-semibold">{moeda.format(fatura)}</p><p className="text-[10px] text-white/70">{moeda.format(disponivel)} disponível</p></div>
+                      <div className="text-right"><p className="text-[10px] uppercase tracking-widest text-white/65">Vence</p><p className="font-semibold">Dia {cartao.dia_vencimento}</p></div>
+                    </div>
                   </div>
                 </div>
               </article>

@@ -60,9 +60,10 @@ router.post("/gerar", async (req, res, next) => {
             [req.usuarioId, ano, mes]
         );
         const movimentacoes = await pool.query(
-            `SELECT m.*, l.quantidade AS quantidade
+            `SELECT m.*, l.quantidade AS quantidade, c.nome AS cartao_nome
              FROM movimentacoes m
              LEFT JOIN listas l ON l.movimentacao_id = m.id
+             LEFT JOIN cartoes c ON c.id = m.cartao_id
              WHERE m.usuario_id = $1
                AND m.data >= make_date($2, $3, 1)
                AND m.data < make_date($2, $3, 1) + INTERVAL '1 month'

@@ -55,6 +55,8 @@ export default function FinancasPage() {
     const [descricao, setDescricao] = useState("");
     const [valor, setValor] = useState("");
     const [categoria, setCategoria] = useState("");
+    const [formaPagamento, setFormaPagamento] = useState<"saldo" | "credito">("saldo");
+    const [cartaoId, setCartaoId] = useState("");
     const [data, setData] = useState(
         new Date().toISOString().split("T")[0]
     );
@@ -174,6 +176,11 @@ export default function FinancasPage() {
             return;
         }
 
+        if (tipo === "despesa" && formaPagamento === "credito" && !cartaoId) {
+            mostrarAviso("Selecione o cartão utilizado.", "erro");
+            return;
+        }
+
         try {
             const nova = await financasService.adicionar({
                 usuario_id: usuario.id,
@@ -182,6 +189,8 @@ export default function FinancasPage() {
                 valor: valorNumero,
                 categoria,
                 data,
+                forma_pagamento: tipo === "despesa" ? formaPagamento : "saldo",
+                cartao_id: tipo === "despesa" && formaPagamento === "credito" ? Number(cartaoId) : null,
             });
 
             setMovimentacoes((prev) => [nova, ...prev]);
@@ -190,6 +199,8 @@ export default function FinancasPage() {
             setDescricao("");
             setValor("");
             setCategoria("");
+            setFormaPagamento("saldo");
+            setCartaoId("");
             setData(new Date().toISOString().split("T")[0]);
 
             mostrarAviso("Movimentação adicionada com sucesso!");
@@ -234,6 +245,8 @@ export default function FinancasPage() {
                 valor: mov.valor,
                 categoria: mov.categoria,
                 data: mov.data,
+                forma_pagamento: mov.forma_pagamento ?? "saldo",
+                cartao_id: mov.cartao_id ?? null,
             });
 
             setMovimentacoes((prev) =>
@@ -284,7 +297,10 @@ export default function FinancasPage() {
         .filter((m) => m.tipo === "despesa")
         .reduce((total, m) => total + Number(m.valor), 0);
 
-    const saldo = receitas - despesas;
+    const despesasNoSaldo = movimentacoesFiltradas
+        .filter((m) => m.tipo === "despesa" && (m.forma_pagamento ?? "saldo") === "saldo")
+        .reduce((total, m) => total + Number(m.valor), 0);
+    const saldo = receitas - despesasNoSaldo;
 
     const dataMesAnterior = new Date(ano, mes - 2, 1);
     const mesAnterior = dataMesAnterior.getMonth() + 1;
@@ -298,6 +314,9 @@ export default function FinancasPage() {
         .reduce((total, mov) => total + Number(mov.valor), 0);
     const despesasAnteriores = movimentacoesAnteriores
         .filter((mov) => mov.tipo === "despesa")
+        .reduce((total, mov) => total + Number(mov.valor), 0);
+    const despesasSaldoAnteriores = movimentacoesAnteriores
+        .filter((mov) => mov.tipo === "despesa" && (mov.forma_pagamento ?? "saldo") === "saldo")
         .reduce((total, mov) => total + Number(mov.valor), 0);
 
     return (
@@ -313,7 +332,7 @@ export default function FinancasPage() {
                 anterior={{
                     receitas: receitasAnteriores,
                     despesas: despesasAnteriores,
-                    saldo: receitasAnteriores - despesasAnteriores,
+                    saldo: receitasAnteriores - despesasSaldoAnteriores,
                 }}
             />
 
@@ -345,6 +364,7 @@ export default function FinancasPage() {
             <CreditCardsPanel
                 cartoes={cartoes}
                 carregando={carregandoCartoes}
+                movimentacoes={movimentacoesFiltradas}
                 onAdicionar={adicionarCartao}
                 onRemover={removerCartao}
             />
@@ -360,6 +380,11 @@ export default function FinancasPage() {
                 setCategoria={setCategoria}
                 data={data}
                 setData={setData}
+                formaPagamento={formaPagamento}
+                setFormaPagamento={setFormaPagamento}
+                cartaoId={cartaoId}
+                setCartaoId={setCartaoId}
+                cartoes={cartoes}
                 adicionarMovimentacao={adicionarMovimentacao}
             />
 
@@ -424,6 +449,7 @@ export default function FinancasPage() {
                 key={movimentacaoEditando?.id ?? "fechado"}
                 aberto={modalAberto}
                 movimentacao={movimentacaoEditando}
+                cartoes={cartoes}
                 onSalvar={salvarEdicao}
                 onFechar={() => {
                     setModalAberto(false);

@@ -305,6 +305,13 @@ export default function FinanceTable({
                                                 <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                     {movimentacao.categoria}
                                                 </span>
+                                                {movimentacao.tipo === "despesa" && (
+                                                    <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
+                                                        {movimentacao.forma_pagamento === "credito"
+                                                            ? `Crédito · ${movimentacao.cartao_nome || "Cartão"}`
+                                                            : "Saldo"}
+                                                    </span>
+                                                )}
                                                 <time dateTime={movimentacao.data}>
                                                     {new Date(movimentacao.data).toLocaleDateString("pt-BR")}
                                                 </time>

@@ -7,6 +7,8 @@ export interface MovimentacaoDTO {
     valor: number;
     categoria: string;
     data?: string;
+    forma_pagamento?: "saldo" | "credito";
+    cartao_id?: number | null;
 }
 
 export interface AtualizarMovimentacaoDTO {
@@ -15,6 +17,8 @@ export interface AtualizarMovimentacaoDTO {
     valor: number;
     categoria: string;
     data: string;
+    forma_pagamento?: "saldo" | "credito";
+    cartao_id?: number | null;
 }
 
 export const financasService = {

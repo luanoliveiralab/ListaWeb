@@ -3,11 +3,13 @@
 import { useState } from "react";
 
 import type { Movimentacao } from "@/types/Movimentacao";
+import type { Cartao } from "@/types/Cartao";
 import { useToast } from "@/providers/ToastProvider";
 
 interface Props {
     aberto: boolean;
     movimentacao: Movimentacao | null;
+    cartoes: Cartao[];
     onSalvar: (dados: Movimentacao) => void;
     onFechar: () => void;
 }
@@ -15,6 +17,7 @@ interface Props {
 export default function EditMovimentacaoModal({
     aberto,
     movimentacao,
+    cartoes,
     onSalvar,
     onFechar,
 }: Props) {
@@ -37,6 +40,8 @@ export default function EditMovimentacaoModal({
             ? String(movimentacao.quantidade)
             : ""
     );
+    const [formaPagamento, setFormaPagamento] = useState<"saldo" | "credito">(movimentacao?.forma_pagamento ?? "saldo");
+    const [cartaoId, setCartaoId] = useState(movimentacao?.cartao_id ? String(movimentacao.cartao_id) : "");
 
     const { mostrarAviso } = useToast();
 
@@ -93,6 +98,11 @@ export default function EditMovimentacaoModal({
             }
         }
 
+        if (tipo === "despesa" && formaPagamento === "credito" && !cartaoId) {
+            mostrarAviso("Selecione o cartão utilizado.", "erro");
+            return;
+        }
+
         const dados: Movimentacao = {
             id: movimentacao.id,
             usuario_id: movimentacao.usuario_id,
@@ -112,6 +122,8 @@ export default function EditMovimentacaoModal({
             quantidade: ehItemDaLista
                 ? Number(quantidade)
                 : null,
+            forma_pagamento: tipo === "despesa" ? formaPagamento : "saldo",
+            cartao_id: tipo === "despesa" && formaPagamento === "credito" ? Number(cartaoId) : null,
         };
 
         onSalvar(dados);
@@ -167,6 +179,10 @@ export default function EditMovimentacaoModal({
                                 );
 
                                 setCategoria("");
+                                if (e.target.value === "receita") {
+                                    setFormaPagamento("saldo");
+                                    setCartaoId("");
+                                }
                             }}
                             className="control"
                         >
@@ -179,6 +195,26 @@ export default function EditMovimentacaoModal({
                             </option>
                         </select>
                     </div>
+
+                    {tipo === "despesa" && (
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">Forma de pagamento</label>
+                            <select value={formaPagamento} onChange={(e) => { const forma = e.target.value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} className="control">
+                                <option value="saldo">Usar saldo</option>
+                                <option value="credito" disabled={cartoes.length === 0}>Cartão de crédito</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {tipo === "despesa" && formaPagamento === "credito" && (
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">Cartão</label>
+                            <select value={cartaoId} onChange={(e) => setCartaoId(e.target.value)} className="control">
+                                <option value="">Selecionar cartão</option>
+                                {cartoes.map((cartao) => <option key={cartao.id} value={cartao.id}>{cartao.nome} · {cartao.instituicao}</option>)}
+                            </select>
+                        </div>
+                    )}
 
                     {/* DESCRIÇÃO */}
 

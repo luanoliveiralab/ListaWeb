@@ -1,5 +1,7 @@
 "use client";
 
+import type { Cartao } from "@/types/Cartao";
+
 interface Props {
     tipo: "receita" | "despesa";
     setTipo: (tipo: "receita" | "despesa") => void;
@@ -16,6 +18,12 @@ interface Props {
     data: string;
     setData: (valor: string) => void;
 
+    formaPagamento: "saldo" | "credito";
+    setFormaPagamento: (valor: "saldo" | "credito") => void;
+    cartaoId: string;
+    setCartaoId: (valor: string) => void;
+    cartoes: Cartao[];
+
     adicionarMovimentacao: () => void;
 }
 
@@ -30,6 +38,11 @@ export default function AddMovimentacaoForm({
     setCategoria,
     data,
     setData,
+    formaPagamento,
+    setFormaPagamento,
+    cartaoId,
+    setCartaoId,
+    cartoes,
     adicionarMovimentacao,
 }: Props) {
     return (
@@ -57,6 +70,10 @@ export default function AddMovimentacaoForm({
 
                             setTipo(novoTipo);
                             setCategoria("");
+                            if (novoTipo === "receita") {
+                                setFormaPagamento("saldo");
+                                setCartaoId("");
+                            }
                         }}
                         className="control mt-2"
                     >
@@ -78,6 +95,27 @@ export default function AddMovimentacaoForm({
                         className="control mt-2"
                     />
                 </div>
+
+                {tipo === "despesa" && (
+                    <div>
+                        <label className="field-label">Forma de pagamento</label>
+                        <select value={formaPagamento} onChange={(e) => { const forma = e.target.value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} className="control mt-2">
+                            <option value="saldo">Usar saldo</option>
+                            <option value="credito" disabled={cartoes.length === 0}>Cartão de crédito</option>
+                        </select>
+                        {cartoes.length === 0 && <p className="mt-1 text-xs text-muted-foreground">Cadastre um cartão para utilizar crédito.</p>}
+                    </div>
+                )}
+
+                {tipo === "despesa" && formaPagamento === "credito" && (
+                    <div>
+                        <label className="field-label">Cartão</label>
+                        <select value={cartaoId} onChange={(e) => setCartaoId(e.target.value)} className="control mt-2" required>
+                            <option value="">Selecionar cartão</option>
+                            {cartoes.map((cartao) => <option key={cartao.id} value={cartao.id}>{cartao.nome} · {cartao.instituicao}</option>)}
+                        </select>
+                    </div>
+                )}
 
                 <div>
                     <label className="field-label">
