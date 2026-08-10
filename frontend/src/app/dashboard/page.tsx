@@ -11,6 +11,7 @@ import type { ItemLista } from "@/types/ItemLista";
 import { dashboardService, type DashboardData } from "@/services/dashboard.service";
 
 import type { Movimentacao } from "@/types/Movimentacao";
+import type { Cartao } from "@/types/Cartao";
 
 import RecentMovimentacoes from "@/components/dashboard/RecentMovimentacoes";
 
@@ -26,6 +27,7 @@ export default function Dashboard() {
 
   const [lista, setLista] = useState<ItemLista[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
+  const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [loading, setLoading] = useState(true);
 
   const {
@@ -47,6 +49,7 @@ export default function Dashboard() {
           const dados: DashboardData = JSON.parse(cache);
           setLista(dados.lista);
           setMovimentacoes(dados.movimentacoes);
+          setCartoes(dados.cartoes ?? []);
           setLoading(false);
         } catch {
           sessionStorage.removeItem(cacheKey);
@@ -57,6 +60,7 @@ export default function Dashboard() {
         const dados = await dashboardService.buscar(mes, ano);
         setLista(dados.lista);
         setMovimentacoes(dados.movimentacoes);
+        setCartoes(dados.cartoes ?? []);
         sessionStorage.setItem(cacheKey, JSON.stringify(dados));
       } catch (err) {
         console.error(err);
@@ -115,18 +119,13 @@ export default function Dashboard() {
     .filter((mov) => mov.tipo === "despesa")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
 
-  const saldo = receitas - despesas;
+  const despesasNoSaldo = movimentacoesFiltradas
+    .filter((mov) => mov.tipo === "despesa" && (mov.forma_pagamento ?? "saldo") === "saldo")
+    .reduce((acc, mov) => acc + Number(mov.valor), 0);
+  const saldo = receitas - despesasNoSaldo;
 
   const quantidadeMovimentacoes =
     movimentacoesFiltradas.length;
-
-  const ticketMedio =
-    quantidadeMovimentacoes === 0
-      ? 0
-      : movimentacoesFiltradas.reduce(
-        (acc, mov) => acc + Number(mov.valor),
-        0
-      ) / quantidadeMovimentacoes;
 
   const ultimasMovimentacoes = [...movimentacoesFiltradas]
     .sort(
@@ -162,7 +161,8 @@ export default function Dashboard() {
         receitas={receitas}
         despesas={despesas}
         movimentacoes={quantidadeMovimentacoes}
-        ticketMedio={ticketMedio}
+        cartoes={cartoes}
+        movimentacoesDoPeriodo={movimentacoesFiltradas}
       />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">

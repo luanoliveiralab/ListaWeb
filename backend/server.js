@@ -1340,7 +1340,7 @@ app.get("/dashboard", autenticar, async (req, res) => {
     }
 
     try {
-        const [lista, movimentacoes] = await Promise.all([
+        const [lista, movimentacoes, cartoes] = await Promise.all([
             pool.query(
                 `SELECT
                     id, nome, quantidade, categoria, valor,
@@ -1364,11 +1364,18 @@ app.get("/dashboard", autenticar, async (req, res) => {
                  ORDER BY m.data DESC, m.id DESC`,
                 [req.usuarioId, ano, mes]
             ),
+            pool.query(
+                `SELECT * FROM cartoes
+                 WHERE usuario_id = $1
+                 ORDER BY created_at DESC, id DESC`,
+                [req.usuarioId]
+            ),
         ]);
 
         return res.json({
             lista: lista.rows,
             movimentacoes: movimentacoes.rows,
+            cartoes: cartoes.rows,
         });
     } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
