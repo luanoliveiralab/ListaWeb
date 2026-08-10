@@ -64,7 +64,17 @@ export default function PerfilPage() {
       return;
     }
 
-    const emailMudou = Boolean(email.trim()) && email.trim().toLowerCase() !== usuario.email.toLowerCase();
+    if (nome.trim() && nome.trim().toLocaleLowerCase("pt-BR") === usuario.nome.trim().toLocaleLowerCase("pt-BR")) {
+      mostrarAviso("Este nome já existe no seu perfil.", "erro");
+      return;
+    }
+
+    if (email.trim() && email.trim().toLowerCase() === usuario.email.trim().toLowerCase()) {
+      mostrarAviso("Este e-mail já existe no seu perfil.", "erro");
+      return;
+    }
+
+    const emailMudou = Boolean(email.trim());
     if (emailMudou) {
       setConfirmarEmail(true);
       return;

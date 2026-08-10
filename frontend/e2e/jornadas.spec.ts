@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const usuario = { id: 42, nome: "Luan Oliveira", email: "luan@example.com", foto: null };
+const usuario = { id: 42, nome: "Luan Oliveira", email: "luan@example.com", foto: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" };
 const responderJson = (route: Route, body: unknown, status = 200) => route.fulfill({
   status,
   contentType: "application/json",
@@ -143,4 +143,26 @@ test("solicita confirmação visual nas exclusões financeiras e de planejamento
   await page.getByRole("button", { name: "Cancelar" }).click();
   await page.getByRole("button", { name: "Excluir meta Reserva" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta meta?" })).toBeVisible();
+});
+
+test("confirma remoção da foto e avisa quando os dados pessoais não mudam", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/perfil");
+
+  await page.getByRole("button", { name: "Remover foto" }).click();
+  await expect(page.getByRole("heading", { name: "Remover sua foto?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sim, remover foto" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+
+  await page.getByLabel("Nome", { exact: true }).fill(usuario.nome);
+  await page.getByRole("button", { name: "Salvar Alterações" }).click();
+  await expect(page.getByText("Este nome já existe no seu perfil.")).toBeVisible();
+  await page.getByLabel("Nome", { exact: true }).fill("");
+  await page.getByLabel("E-mail", { exact: true }).fill(usuario.email.toUpperCase());
+  await page.getByRole("button", { name: "Salvar Alterações" }).click();
+  await expect(page.getByText("Este e-mail já existe no seu perfil.")).toBeVisible();
 });

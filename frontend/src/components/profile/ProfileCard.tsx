@@ -9,6 +9,7 @@ import { useToast } from "@/providers/ToastProvider";
 import type { Usuario } from "@/types/Usuario";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 import {
     AlertDialog,
@@ -46,6 +47,8 @@ export default function ProfileCard({
 
     const [excluindoConta, setExcluindoConta] =
         useState(false);
+    const [confirmarRemocaoFoto, setConfirmarRemocaoFoto] = useState(false);
+    const [removendoFoto, setRemovendoFoto] = useState(false);
 
     async function selecionarFoto(
         e: React.ChangeEvent<HTMLInputElement>
@@ -105,12 +108,14 @@ export default function ProfileCard({
     }
 
     async function removerFoto() {
+        setRemovendoFoto(true);
         try {
             const usuarioAtualizado = await api.delete(
                 `/usuarios/${id}/foto`
             );
 
             setUsuario(usuarioAtualizado);
+            setConfirmarRemocaoFoto(false);
 
             mostrarAviso(
                 "Foto removida com sucesso!"
@@ -125,7 +130,7 @@ export default function ProfileCard({
                 "Erro ao remover foto.",
                 "erro"
             );
-        }
+        } finally { setRemovendoFoto(false); }
     }
 
     async function excluirConta() {
@@ -205,11 +210,22 @@ export default function ProfileCard({
                     <Button
                         variant="destructive"
                         className="mt-2 w-full"
-                        onClick={removerFoto}
+                        onClick={() => setConfirmarRemocaoFoto(true)}
                     >
                         Remover foto
                     </Button>
                 )}
+
+                <ConfirmationDialog
+                    aberto={confirmarRemocaoFoto}
+                    titulo="Remover sua foto?"
+                    descricao="A foto atual será removida do seu perfil. Você poderá adicionar outra imagem quando quiser."
+                    confirmar="Sim, remover foto"
+                    processando={removendoFoto}
+                    textoProcessando="Removendo..."
+                    onConfirmar={removerFoto}
+                    onAlterar={setConfirmarRemocaoFoto}
+                />
 
                 <input
                     ref={inputFotoRef}
