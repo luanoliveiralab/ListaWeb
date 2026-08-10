@@ -140,7 +140,8 @@ test("pergunta a forma de pagamento antes de concluir um item", async ({ page })
 
   await page.getByRole("button", { name: "Marcar Arroz como comprado" }).click();
   await page.getByRole("button", { name: /Cartão de crédito/ }).click();
-  await page.getByLabel("Qual cartão?").selectOption("1");
+  await page.getByLabel("Qual cartão?").click();
+  await page.getByRole("option", { name: /Nubank/ }).click();
   await page.getByRole("button", { name: "Confirmar compra" }).click();
   await expect(page.getByText("Compra adicionada à fatura do cartão.")).toBeVisible();
   expect(pagamento).toEqual({ comprado: true, forma_pagamento: "credito", cartao_id: 1 });
@@ -202,9 +203,11 @@ test("exibe em cada página somente as categorias configuradas", async ({ page }
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.goto("/lista");
   await page.getByRole("button", { name: "Criar novo item" }).click();
-  const categoriasLista = page.locator("form select").first();
-  await expect(categoriasLista.locator("option")).toContainText(["Selecionar categoria", "Pets"]);
-  await expect(categoriasLista.locator("option", { hasText: "Mercado" })).toHaveCount(0);
+  const categoriasLista = page.locator("form").getByRole("combobox").first();
+  await expect(categoriasLista).toContainText("Selecionar categoria");
+  await categoriasLista.click();
+  await expect(page.getByRole("option", { name: "Pets" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Mercado" })).toHaveCount(0);
 });
 
 test("solicita confirmação visual nas exclusões financeiras e de planejamento", async ({ page }) => {

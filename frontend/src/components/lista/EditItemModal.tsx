@@ -1,5 +1,7 @@
 "use client";
 
+import AppSelect from "@/components/shared/AppSelect";
+
 import { useState } from "react";
 
 import type { ItemLista } from "@/types/ItemLista";
@@ -171,20 +173,15 @@ export default function EditItemModal({
                             Categoria
                         </label>
 
-                        <select
+                        <AppSelect
                             value={categoria}
-                            onChange={(e) =>
-                                setCategoria(e.target.value)
-                            }
-                            className="control"
-                        >
-                            <option value="">
-                                Selecionar categoria
-                            </option>
-
-                            {!categorias.some((item) => item.nome === categoria) && categoria && <option value={categoria}>{categoria}</option>}
-                            {categorias.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}
-                        </select>
+                            onValueChange={setCategoria}
+                            placeholder="Selecionar categoria"
+                            options={[
+                                ...(!categorias.some((item) => item.nome === categoria) && categoria ? [{ value: categoria, label: categoria }] : []),
+                                ...categorias.map((item) => ({ value: item.nome, label: item.nome })),
+                            ]}
+                        />
                     </div>
 
                 </div>

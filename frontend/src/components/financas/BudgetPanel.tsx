@@ -6,6 +6,7 @@ import type { Movimentacao } from "@/types/Movimentacao";
 import type { Orcamento } from "@/types/Orcamento";
 import { useCategorias } from "@/hooks/useCategorias";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import AppSelect from "@/components/shared/AppSelect";
 
 interface Props {
   orcamentos: Orcamento[];
@@ -56,7 +57,7 @@ export default function BudgetPanel({ orcamentos, movimentacoes, onSalvar, onRem
 
         {formularioAberto && (
           <form onSubmit={salvar} className="mt-5 grid animate-in gap-4 border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300 sm:grid-cols-2">
-            <div className="field-group"><label className="field-label">Categoria</label><select value={categoria} onChange={(event) => setCategoria(event.target.value)} className="control"><option value="">Selecionar categoria</option>{categorias.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}</select></div>
+            <div className="field-group"><label className="field-label">Categoria</label><AppSelect value={categoria} onValueChange={setCategoria} placeholder="Selecionar categoria" options={categorias.map((item) => ({ value: item.nome, label: item.nome }))} /></div>
             <div className="field-group"><label className="field-label">Limite mensal</label><input inputMode="decimal" value={valor} onChange={(event) => setValor(event.target.value)} placeholder="R$ 0,00" className="control" /></div>
             <div className="expandable-form-actions sm:col-span-2"><button type="button" onClick={() => { setCategoria(""); setValor(""); setFormularioAberto(false); }} disabled={salvando} className="button-secondary">Cancelar</button><button className="button-primary" disabled={salvando || !categoria || !valor}><Plus size={17} /> {salvando ? "Salvando..." : "Definir orçamento"}</button></div>
           </form>

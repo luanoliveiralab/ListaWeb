@@ -10,6 +10,7 @@ import type { FaturaCartao } from "@/types/Cartao";
 import { cartoesService } from "@/services/cartoes.service";
 import { useToast } from "@/providers/ToastProvider";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import AppSelect from "@/components/shared/AppSelect";
 
 interface Props {
   cartoes: Cartao[];
@@ -156,10 +157,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           </div>
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-banco">Instituição</label>
-            <select id="cartao-banco" className="control" value={instituicao} onChange={(e) => setInstituicao(e.target.value)} required>
-              <option value="">Selecione o banco</option>
-              {instituicoes.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <AppSelect id="cartao-banco" value={instituicao} onValueChange={setInstituicao} placeholder="Selecione o banco" options={instituicoes.map((item) => ({ value: item, label: item }))} required />
           </div>
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-limite">Limite disponível</label>
@@ -167,10 +165,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           </div>
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-vencimento">Vencimento</label>
-            <select id="cartao-vencimento" className="control" value={vencimento} onChange={(e) => setVencimento(e.target.value)} required>
-              <option value="">Selecione o dia</option>
-              {Array.from({ length: 31 }, (_, index) => index + 1).map((dia) => <option key={dia} value={dia}>Dia {dia}</option>)}
-            </select>
+            <AppSelect id="cartao-vencimento" value={vencimento} onValueChange={setVencimento} placeholder="Selecione o dia" options={Array.from({ length: 31 }, (_, index) => ({ value: String(index + 1), label: `Dia ${index + 1}` }))} required />
           </div>
           {instituicao === "Outra instituição" && (
             <div className="field-group md:col-span-2 xl:col-span-5">

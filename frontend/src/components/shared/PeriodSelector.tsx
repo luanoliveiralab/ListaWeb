@@ -1,5 +1,7 @@
 "use client";
 
+import AppSelect from "@/components/shared/AppSelect";
+
 interface Props {
     mes: number;
     ano: number;
@@ -43,21 +45,14 @@ export default function PeriodSelector({
                     Mês
                 </label>
 
-                <select
+                <AppSelect
                     id="periodo-mes"
-                    value={mes}
-                    onChange={(e) => onMesChange(Number(e.target.value))}
-                    className="rounded-xl border border-border bg-background px-4 py-3 outline-none transition focus:ring-2 focus:ring-primary"
-                >
-                    {meses.map((nome, index) => (
-                        <option
-                            key={index}
-                            value={index + 1}
-                        >
-                            {nome}
-                        </option>
-                    ))}
-                </select>
+                    value={String(mes)}
+                    onValueChange={(value) => onMesChange(Number(value))}
+                    className="w-40"
+                    ariaLabel="Selecionar mês"
+                    options={meses.map((nome, index) => ({ value: String(index + 1), label: nome }))}
+                />
             </div>
 
             <div className="flex items-center gap-2">
@@ -65,21 +60,14 @@ export default function PeriodSelector({
                     Ano
                 </label>
 
-                <select
+                <AppSelect
                     id="periodo-ano"
-                    value={ano}
-                    onChange={(e) => onAnoChange(Number(e.target.value))}
-                    className="rounded-xl border border-border bg-background px-4 py-3 outline-none transition focus:ring-2 focus:ring-primary"
-                >
-                    {anos.map((ano) => (
-                        <option
-                            key={ano}
-                            value={ano}
-                        >
-                            {ano}
-                        </option>
-                    ))}
-                </select>
+                    value={String(ano)}
+                    onValueChange={(value) => onAnoChange(Number(value))}
+                    className="w-32"
+                    ariaLabel="Selecionar ano"
+                    options={anos.map((item) => ({ value: String(item), label: String(item) }))}
+                />
             </div>
         </div>
     );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useCategorias } from "@/hooks/useCategorias";
+import AppSelect from "@/components/shared/AppSelect";
 
 interface AddItemFormProps {
   itemNome: string;
@@ -55,7 +56,7 @@ export default function AddItemForm({
           <div className="form-grid">
             <div className="md:col-span-2"><label className="field-label">Descrição</label><input value={itemNome} onChange={(event) => setItemNome(event.target.value)} placeholder="Ex.: Arroz" className="control mt-2" /></div>
             <div><label className="field-label">Quantidade</label><input type="number" min={1} value={itemQtd} onChange={(event) => setItemQtd(event.target.value)} placeholder="1" className="control mt-2" /></div>
-            <div><label className="field-label">Categoria</label><select value={categoria} onChange={(event) => setCategoria(event.target.value)} className="control mt-2"><option value="" disabled>Selecionar categoria</option>{categorias.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}</select></div>
+            <div><label className="field-label">Categoria</label><AppSelect value={categoria} onValueChange={setCategoria} className="mt-2" placeholder="Selecionar categoria" options={categorias.map((item) => ({ value: item.nome, label: item.nome }))} /></div>
             <div><label className="field-label">Valor (R$)</label><input type="number" min={0} step="0.01" value={itemValor} onChange={(event) => setItemValor(event.target.value)} placeholder="R$ 0,00" className="control mt-2" /></div>
           </div>
           <div className="expandable-form-actions mt-6">

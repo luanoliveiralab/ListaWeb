@@ -6,6 +6,7 @@ import type { Movimentacao } from "@/types/Movimentacao";
 import type { Cartao } from "@/types/Cartao";
 import { useToast } from "@/providers/ToastProvider";
 import { useCategorias } from "@/hooks/useCategorias";
+import AppSelect from "@/components/shared/AppSelect";
 
 interface Props {
     aberto: boolean;
@@ -147,50 +148,31 @@ export default function EditMovimentacaoModal({
                             Tipo
                         </label>
 
-                        <select
+                        <AppSelect
                             value={tipo}
-                            onChange={(e) => {
-                                setTipo(
-                                    e.target.value as
-                                        | "receita"
-                                        | "despesa"
-                                );
-
+                            onValueChange={(value) => {
+                                setTipo(value as "receita" | "despesa");
                                 setCategoria("");
-                                if (e.target.value === "receita") {
+                                if (value === "receita") {
                                     setFormaPagamento("saldo");
                                     setCartaoId("");
                                 }
                             }}
-                            className="control"
-                        >
-                            <option value="receita">
-                                Receita
-                            </option>
-
-                            <option value="despesa">
-                                Despesa
-                            </option>
-                        </select>
+                            options={[{ value: "receita", label: "Receita" }, { value: "despesa", label: "Despesa" }]}
+                        />
                     </div>
 
                     {tipo === "despesa" && (
                         <div>
                             <label className="mb-2 block text-sm font-medium">Forma de pagamento</label>
-                            <select value={formaPagamento} onChange={(e) => { const forma = e.target.value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} className="control">
-                                <option value="saldo">Usar saldo</option>
-                                <option value="credito" disabled={cartoes.length === 0}>Cartão de crédito</option>
-                            </select>
+                            <AppSelect value={formaPagamento} onValueChange={(value) => { const forma = value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} />
                         </div>
                     )}
 
                     {tipo === "despesa" && formaPagamento === "credito" && (
                         <div>
                             <label className="mb-2 block text-sm font-medium">Cartão</label>
-                            <select value={cartaoId} onChange={(e) => setCartaoId(e.target.value)} className="control">
-                                <option value="">Selecionar cartão</option>
-                                {cartoes.map((cartao) => <option key={cartao.id} value={cartao.id}>{cartao.nome} · {cartao.instituicao}</option>)}
-                            </select>
+                            <AppSelect value={cartaoId} onValueChange={setCartaoId} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} />
                         </div>
                     )}
 
@@ -266,29 +248,15 @@ export default function EditMovimentacaoModal({
                             Categoria
                         </label>
 
-                        <select
+                        <AppSelect
                             value={categoria}
-                            onChange={(e) =>
-                                setCategoria(e.target.value)
-                            }
-                            className="control"
-                        >
-                            <option value="" disabled>
-                                Selecionar categoria
-                            </option>
-
-                            {!categorias.some((item) => item.nome === categoria) && categoria && <option value={categoria}>{categoria}</option>}
-                            {categorias.map(
-                                (categoriaItem) => (
-                                    <option
-                                        key={categoriaItem.id}
-                                        value={categoriaItem.nome}
-                                    >
-                                        {categoriaItem.nome}
-                                    </option>
-                                )
-                            )}
-                        </select>
+                            onValueChange={setCategoria}
+                            placeholder="Selecionar categoria"
+                            options={[
+                                ...(!categorias.some((item) => item.nome === categoria) && categoria ? [{ value: categoria, label: categoria }] : []),
+                                ...categorias.map((item) => ({ value: item.nome, label: item.nome })),
+                            ]}
+                        />
                     </div>
                 </div>
 
