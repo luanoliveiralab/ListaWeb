@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 ![Testes](https://img.shields.io/badge/testes-57%20aprovados-success)
 
-O **ListaWeb** é uma aplicação gratuita e de código aberto para organizar compras, finanças pessoais e planejamento em um único lugar. O projeto nasceu para transformar tarefas financeiras cotidianas em uma experiência simples, visual e acessível, sem exigir planilhas complexas.
+O **ListaWeb** é uma aplicação pública, gratuita e de código aberto para organizar compras, finanças pessoais e planejamento em um único lugar. O projeto nasceu para transformar tarefas financeiras cotidianas em uma experiência simples, visual e acessível, sem exigir planilhas complexas.
 
 🔗 **Aplicação:** [listaweb.netlify.app](https://listaweb.netlify.app/)
 
@@ -216,6 +216,18 @@ Desenvolvido por **Luan Oliveira** como projeto independente de produto, design 
 
 - [GitHub](https://github.com/luanoliveiralab)
 - [Repositório do ListaWeb](https://github.com/luanoliveiralab/ListaWeb)
+
+## Contribuições
+
+Sugestões, relatos de bugs e melhorias são bem-vindos. Antes de contribuir:
+
+1. não publique dados pessoais, financeiros ou credenciais;
+2. abra uma issue descrevendo o problema ou a proposta;
+3. crie uma branch específica para a alteração;
+4. execute os testes e a verificação de segurança;
+5. envie um pull request explicando o impacto da mudança.
+
+Falhas de segurança devem seguir o processo privado descrito em [SECURITY.md](SECURITY.md), nunca uma issue pública.
 
 ## Licença
 
