@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import AppLayout from "@/components/layout/AppLayout";
 import FinanceCards from "@/components/financas/FinanceCards";
@@ -30,10 +31,8 @@ import type { Cartao } from "@/types/Cartao";
 export default function FinancasPage() {
     const { usuario } = useUsuario();
     const { mostrarAviso } = useToast();
+    const queryClient = useQueryClient();
 
-    const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
-    const [cartoes, setCartoes] = useState<Cartao[]>([]);
-    const [carregandoCartoes, setCarregandoCartoes] = useState(true);
     const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
     const [modalAberto, setModalAberto] = useState(false);
 
@@ -44,8 +43,6 @@ export default function FinancasPage() {
         useState<Movimentacao | null>(null);
 
     const [modalExcluir, setModalExcluir] = useState(false);
-
-    const [loading, setLoading] = useState(true);
 
     const [tipo, setTipo] = useState<"receita" | "despesa">("receita");
     const [descricao, setDescricao] = useState("");
@@ -64,81 +61,38 @@ export default function FinancasPage() {
         setAno,
     } = usePeriod();
 
-    // =========================
-    // CARREGAR MOVIMENTAÇÕES
-    // =========================
-    useEffect(() => {
-        if (!usuario?.id) return;
-
-        async function load() {
-            const cacheKey = `financas:${usuario!.id}:${ano}-${mes}`;
-            const cache = sessionStorage.getItem(cacheKey);
-            if (cache) {
-                try {
-                    setMovimentacoes(JSON.parse(cache));
-                    setLoading(false);
-                } catch {
-                    sessionStorage.removeItem(cacheKey);
-                }
-            }
-
-            try {
-                if (!cache) setLoading(true);
-
-                const resposta = await planejamentoService.gerarRecorrencias(mes, ano);
-                setMovimentacoes(resposta.movimentacoes);
-                sessionStorage.setItem(cacheKey, JSON.stringify(resposta.movimentacoes));
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        load();
-    }, [ano, mes, usuario]);
+    const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
+    const cartoesKey = ["cartoes", usuario?.id] as const;
+    const movimentacoesQuery = useQuery<Movimentacao[]>({
+        queryKey: movimentacoesKey,
+        queryFn: async () => (await planejamentoService.gerarRecorrencias(mes, ano)).movimentacoes,
+        enabled: Boolean(usuario?.id),
+    });
+    const cartoesQuery = useQuery<Cartao[]>({
+        queryKey: cartoesKey,
+        queryFn: cartoesService.listar,
+        enabled: Boolean(usuario?.id),
+    });
+    const movimentacoes = movimentacoesQuery.data ?? [];
+    const cartoes = cartoesQuery.data ?? [];
+    const loading = movimentacoesQuery.isPending;
+    const carregandoCartoes = cartoesQuery.isPending;
 
     useEffect(() => {
-        if (usuario?.id && !loading) {
-            sessionStorage.setItem(`financas:${usuario.id}:${ano}-${mes}`, JSON.stringify(movimentacoes));
-        }
-    }, [ano, loading, mes, movimentacoes, usuario?.id]);
+        if (cartoesQuery.error) mostrarAviso("Não foi possível carregar os cartões.", "erro");
+    }, [cartoesQuery.error, mostrarAviso]);
 
-    useEffect(() => {
-        if (!usuario?.id) return;
+    function atualizarMovimentacoes(atualizar: (atuais: Movimentacao[]) => Movimentacao[]) {
+        queryClient.setQueryData<Movimentacao[]>(movimentacoesKey, (atuais = []) => atualizar(atuais));
+    }
 
-        async function carregarCartoes() {
-            const cacheKey = `cartoes:${usuario!.id}`;
-            const cache = sessionStorage.getItem(cacheKey);
-            if (cache) {
-                try {
-                    setCartoes(JSON.parse(cache));
-                    setCarregandoCartoes(false);
-                } catch {
-                    sessionStorage.removeItem(cacheKey);
-                }
-            }
+    function atualizarCartoes(atualizar: (atuais: Cartao[]) => Cartao[]) {
+        queryClient.setQueryData<Cartao[]>(cartoesKey, (atuais = []) => atualizar(atuais));
+    }
 
-            try {
-                const dados = await cartoesService.listar();
-                setCartoes(dados);
-                sessionStorage.setItem(cacheKey, JSON.stringify(dados));
-            } catch (err) {
-                console.error(err);
-                mostrarAviso("Não foi possível carregar os cartões.", "erro");
-            } finally {
-                setCarregandoCartoes(false);
-            }
-        }
-
-        carregarCartoes();
-    }, [mostrarAviso, usuario]);
-
-    useEffect(() => {
-        if (usuario?.id && !carregandoCartoes) {
-            sessionStorage.setItem(`cartoes:${usuario.id}`, JSON.stringify(cartoes));
-        }
-    }, [carregandoCartoes, cartoes, usuario?.id]);
+    function atualizarDashboard() {
+        queryClient.invalidateQueries({ queryKey: ["dashboard", usuario?.id] });
+    }
 
     async function adicionarCartao(dados: {
         nome: string;
@@ -152,13 +106,14 @@ export default function FinancasPage() {
             ...dados,
             created_at: new Date().toISOString(),
         };
-        setCartoes((atuais) => [temporario, ...atuais]);
+        atualizarCartoes((atuais) => [temporario, ...atuais]);
         try {
             const novo = await cartoesService.adicionar(dados);
-            setCartoes((atuais) => atuais.map((cartao) => cartao.id === temporario.id ? novo : cartao));
+            atualizarCartoes((atuais) => atuais.map((cartao) => cartao.id === temporario.id ? novo : cartao));
+            atualizarDashboard();
             mostrarAviso("Cartão adicionado com sucesso!");
         } catch (err) {
-            setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== temporario.id));
+            atualizarCartoes((atuais) => atuais.filter((cartao) => cartao.id !== temporario.id));
             console.error(err);
             mostrarAviso("Não foi possível adicionar o cartão.", "erro");
             throw err;
@@ -167,12 +122,13 @@ export default function FinancasPage() {
 
     async function removerCartao(id: number) {
         const removido = cartoes.find((cartao) => cartao.id === id);
-        setCartoes((atuais) => atuais.filter((cartao) => cartao.id !== id));
+        atualizarCartoes((atuais) => atuais.filter((cartao) => cartao.id !== id));
         try {
             await cartoesService.remover(id);
+            atualizarDashboard();
             mostrarAviso("Cartão removido.");
         } catch (err) {
-            if (removido) setCartoes((atuais) => [removido, ...atuais]);
+            if (removido) atualizarCartoes((atuais) => [removido, ...atuais]);
             console.error(err);
             mostrarAviso("Não foi possível remover o cartão.", "erro");
         }
@@ -210,7 +166,7 @@ export default function FinancasPage() {
             cartao_id: cartaoFinal,
             cartao_nome: cartaoFinal ? cartoes.find((cartao) => cartao.id === cartaoFinal)?.nome ?? null : null,
         };
-        setMovimentacoes((prev) => [temporaria, ...prev]);
+        atualizarMovimentacoes((prev) => [temporaria, ...prev]);
         setTipo("receita");
         setDescricao("");
         setValor("");
@@ -231,12 +187,13 @@ export default function FinancasPage() {
                 cartao_id: cartaoFinal,
             });
 
-            setMovimentacoes((prev) => prev.map((mov) => mov.id === temporaria.id ? nova : mov));
+            atualizarMovimentacoes((prev) => prev.map((mov) => mov.id === temporaria.id ? nova : mov));
+            atualizarDashboard();
 
             mostrarAviso("Movimentação adicionada com sucesso!");
             return true;
         } catch (err) {
-            setMovimentacoes((prev) => prev.filter((mov) => mov.id !== temporaria.id));
+            atualizarMovimentacoes((prev) => prev.filter((mov) => mov.id !== temporaria.id));
             console.error(err);
             mostrarAviso("Erro ao adicionar movimentação.", "erro");
             return false;
@@ -254,12 +211,13 @@ export default function FinancasPage() {
 
     async function excluirMovimentacao(id: number) {
         const removida = movimentacoes.find((mov) => mov.id === id);
-        setMovimentacoes((prev) => prev.filter((mov) => mov.id !== id));
+        atualizarMovimentacoes((prev) => prev.filter((mov) => mov.id !== id));
         try {
             await financasService.remover(id);
+            atualizarDashboard();
             mostrarAviso("Movimentação excluída com sucesso!");
         } catch (err) {
-            if (removida) setMovimentacoes((prev) => [removida, ...prev]);
+            if (removida) atualizarMovimentacoes((prev) => [removida, ...prev]);
             console.error(err);
             mostrarAviso("Erro ao excluir movimentação.", "erro");
         }
@@ -270,7 +228,7 @@ export default function FinancasPage() {
     // =========================
     async function salvarEdicao(mov: Movimentacao) {
         const anterior = movimentacoes.find((item) => item.id === mov.id);
-        setMovimentacoes((prev) => prev.map((item) => item.id === mov.id ? mov : item));
+        atualizarMovimentacoes((prev) => prev.map((item) => item.id === mov.id ? mov : item));
         setModalAberto(false);
         setMovimentacaoEditando(null);
         try {
@@ -284,15 +242,16 @@ export default function FinancasPage() {
                 cartao_id: mov.cartao_id ?? null,
             });
 
-            setMovimentacoes((prev) =>
+            atualizarMovimentacoes((prev) =>
                 prev.map((m) =>
                     m.id === atualizada.id ? atualizada : m
                 )
             );
+            atualizarDashboard();
 
             mostrarAviso("Movimentação atualizada com sucesso!");
         } catch (err) {
-            if (anterior) setMovimentacoes((prev) => prev.map((item) => item.id === anterior.id ? anterior : item));
+            if (anterior) atualizarMovimentacoes((prev) => prev.map((item) => item.id === anterior.id ? anterior : item));
             console.error(err);
             mostrarAviso("Erro ao atualizar movimentação.", "erro");
         }
