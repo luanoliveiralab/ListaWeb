@@ -29,6 +29,10 @@ Frontend: `http://localhost:3000`
 API: `http://localhost:3001`  
 Saúde da API: `http://localhost:3001/health`
 
+## Homologação
+
+O roteiro da primeira rodada está em [`docs/HOMOLOGACAO.md`](docs/HOMOLOGACAO.md). Use apenas contas e dados fictícios e registre problemas com o modelo em [`docs/FEEDBACK_HOMOLOGACAO.md`](docs/FEEDBACK_HOMOLOGACAO.md).
+
 ## Verificações
 
 - Backend: `npm test`
