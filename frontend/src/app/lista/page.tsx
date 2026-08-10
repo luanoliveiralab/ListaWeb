@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import AppLayout from "@/components/layout/AppLayout";
 import AddItemForm from "@/components/lista/AddItemForm";
@@ -18,9 +19,13 @@ import { Search } from "lucide-react";
 export default function ListaPage() {
   const { usuario } = useUsuario();
   const { mostrarAviso } = useToast();
-
-  const [lista, setLista] = useState<ItemLista[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const queryKey = ["lista", usuario?.id] as const;
+  const { data: lista = [], isPending: loading, error } = useQuery<ItemLista[]>({
+    queryKey,
+    queryFn: () => listaService.buscarPorUsuario(usuario!.id),
+    enabled: Boolean(usuario?.id),
+  });
 
   const [itemNome, setItemNome] = useState("");
   const [itemQtd, setItemQtd] = useState("");
@@ -35,56 +40,13 @@ export default function ListaPage() {
 
   const [modalAberto, setModalAberto] = useState(false);
 
-  // =========================
-  // CARREGAR LISTA
-  // =========================
-
   useEffect(() => {
-    if (!usuario?.id) return;
+    if (error) mostrarAviso("Erro ao carregar a lista de compras.", "erro");
+  }, [error, mostrarAviso]);
 
-    async function load() {
-      const cacheKey = `lista:${usuario!.id}`;
-      const cache = sessionStorage.getItem(cacheKey);
-      if (cache) {
-        try {
-          setLista(JSON.parse(cache));
-          setLoading(false);
-        } catch {
-          sessionStorage.removeItem(cacheKey);
-        }
-      }
-
-      try {
-        if (!cache) setLoading(true);
-
-        const usuarioId = usuario?.id;
-
-        if (!usuarioId) return;
-
-        const data = await listaService.buscarPorUsuario(usuarioId);
-
-        setLista(data);
-        sessionStorage.setItem(cacheKey, JSON.stringify(data));
-      } catch (err) {
-        console.error("Erro ao carregar lista:", err);
-
-        mostrarAviso(
-          "Erro ao carregar a lista de compras.",
-          "erro"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, [usuario, mostrarAviso]);
-
-  useEffect(() => {
-    if (usuario?.id && !loading) {
-      sessionStorage.setItem(`lista:${usuario.id}`, JSON.stringify(lista));
-    }
-  }, [lista, loading, usuario?.id]);
+  function atualizarLista(atualizar: (itens: ItemLista[]) => ItemLista[]) {
+    queryClient.setQueryData<ItemLista[]>(queryKey, (atuais = []) => atualizar(atuais));
+  }
 
   // =========================
   // ADICIONAR ITEM
@@ -118,16 +80,28 @@ export default function ListaPage() {
       return false;
     }
 
+    const temporario: ItemLista = {
+      id: -Date.now(),
+      nome: itemNome.trim(),
+      quantidade: itemQtd ? Number(itemQtd) : 1,
+      categoria,
+      valor: Number(valor),
+      comprado: false,
+      movimentacao_id: null,
+      created_at: new Date().toISOString(),
+    };
+    atualizarLista((itens) => [temporario, ...itens]);
+
     try {
       const novo = await listaService.adicionar({
         usuario_id: usuario.id,
         nome: itemNome.trim(),
-        quantidade: Number(itemQtd),
+        quantidade: temporario.quantidade,
         categoria,
         valor: Number(valor),
       });
 
-      setLista((prev) => [novo, ...prev]);
+      atualizarLista((itens) => itens.map((item) => item.id === temporario.id ? novo : item));
 
       setItemNome("");
       setItemQtd("");
@@ -140,6 +114,7 @@ export default function ListaPage() {
       );
       return true;
     } catch (err) {
+      atualizarLista((itens) => itens.filter((item) => item.id !== temporario.id));
       console.error("Erro ao adicionar item:", err);
 
       mostrarAviso(
@@ -165,18 +140,17 @@ export default function ListaPage() {
   // =========================
 
   async function deletarItem(id: number) {
+    const removido = lista.find((item) => item.id === id);
+    atualizarLista((itens) => itens.filter((item) => item.id !== id));
     try {
       await listaService.remover(id);
-
-      setLista((prev) =>
-        prev.filter((item) => item.id !== id)
-      );
 
       mostrarAviso(
         "Item excluído com sucesso!",
         "sucesso"
       );
     } catch (err) {
+      if (removido) atualizarLista((itens) => [removido, ...itens]);
       console.error("Erro ao deletar item:", err);
 
       mostrarAviso(
@@ -192,6 +166,7 @@ export default function ListaPage() {
 
   async function toggleComprado(item: ItemLista) {
     if (item.comprado) return;
+    atualizarLista((itens) => itens.map((atual) => atual.id === item.id ? { ...atual, comprado: true } : atual));
 
     try {
       const atualizado = await listaService.atualizar(
@@ -201,7 +176,7 @@ export default function ListaPage() {
         }
       );
 
-      setLista((prev) =>
+      atualizarLista((prev) =>
         prev.map((i) =>
           i.id === atualizado.id
             ? atualizado
@@ -209,6 +184,7 @@ export default function ListaPage() {
         )
       );
     } catch (err) {
+      atualizarLista((itens) => itens.map((atual) => atual.id === item.id ? item : atual));
       console.error(
         "Erro ao marcar item como comprado:",
         err
@@ -235,6 +211,10 @@ export default function ListaPage() {
   // =========================
 
   async function salvarEdicao(item: ItemLista) {
+    const anterior = lista.find((atual) => atual.id === item.id);
+    atualizarLista((itens) => itens.map((atual) => atual.id === item.id ? item : atual));
+    setModalAberto(false);
+    setItemEditando(null);
     try {
       const atualizado = await listaService.atualizar(
         item.id,
@@ -246,7 +226,7 @@ export default function ListaPage() {
         }
       );
 
-      setLista((prev) =>
+      atualizarLista((prev) =>
         prev.map((i) =>
           i.id === atualizado.id
             ? atualizado
@@ -254,14 +234,12 @@ export default function ListaPage() {
         )
       );
 
-      setModalAberto(false);
-      setItemEditando(null);
-
       mostrarAviso(
         "Item atualizado com sucesso!",
         "sucesso"
       );
     } catch (err) {
+      if (anterior) atualizarLista((itens) => itens.map((atual) => atual.id === anterior.id ? anterior : atual));
       console.error(
         "Erro ao atualizar item:",
         err
