@@ -312,7 +312,9 @@ test("mantém o modal de categorias organizado no desktop e no mobile", async ({
     const caixa = await modal.boundingBox();
     expect(caixa).not.toBeNull();
     expect(caixa!.x).toBeGreaterThanOrEqual(0);
-    expect(caixa!.y + caixa!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    // Chromium pode arredondar dimensões fracionárias de forma diferente entre
+    // Windows e Linux. Um pixel de tolerância ainda garante o modal na viewport.
+    expect(caixa!.y + caixa!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
   } else {
     await expect(page.getByText("Despesas e compras")).toBeVisible();
     await expect(lista).toBeVisible();
