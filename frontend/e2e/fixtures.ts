@@ -7,6 +7,7 @@ export async function prepararApi(page: Page) {
   await page.route("http://localhost:3001/**", async (route) => {
     const { pathname } = new URL(route.request().url());
     if (pathname === "/login") return responderJson(route, { mensagem: "Login OK.", csrfToken: "csrf-teste", usuario });
+    if (pathname === "/cadastro") return responderJson(route, { mensagem: "Usuário criado.", csrfToken: "csrf-teste", usuario });
     if (pathname === "/dashboard") {
       const hoje = new Date(); const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-10`;
       return responderJson(route, { lista: [{ id: 1, nome: "Arroz", quantidade: 2, categoria: "Mercado", valor: 20, comprado: true, movimentacao_id: 1, created_at: hoje.toISOString() }], movimentacoes: [{ id: 1, usuario_id: 42, tipo: "receita", descricao: "Salário", valor: 5000, categoria: "Salário", data, created_at: hoje.toISOString(), forma_pagamento: "saldo" }, { id: 2, usuario_id: 42, tipo: "despesa", descricao: "Mercado", valor: 250, categoria: "Mercado", data, created_at: hoje.toISOString(), forma_pagamento: "saldo" }], cartoes: [{ id: 1, usuario_id: 42, nome: "Principal", instituicao: "Nubank", limite_disponivel: 2000, dia_vencimento: 10, created_at: hoje.toISOString() }] });

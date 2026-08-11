@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { MailCheck } from "lucide-react";
 
 import { authService } from "@/services/auth.service";
 
@@ -12,10 +12,13 @@ import PasswordInput from "@/components/auth/PasswordInput";
 import RegistrationTerms, { TERMS_VERSION } from "@/components/auth/RegistrationTerms";
 
 import { useToast } from "@/providers/ToastProvider";
+import { salvarUsuarioLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function CadastroPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [emailEnviado, setEmailEnviado] = useState("");
   const [termosAceitos, setTermosAceitos] = useState(false);
 
   const { mostrarAviso } = useToast();
@@ -69,7 +72,10 @@ export default function CadastroPage() {
         versaoTermos: TERMS_VERSION,
       });
 
-      setEmailEnviado(data.email || email);
+      queryClient.clear();
+      salvarUsuarioLocal(data.usuario);
+      sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
+      router.replace("/dashboard");
     } catch (err: unknown) {
       mostrarAviso(
         err instanceof Error
@@ -107,14 +113,6 @@ export default function CadastroPage() {
           </p>
         </div>
 
-        {emailEnviado ? (
-          <div className="rounded-2xl bg-emerald-500/10 p-5 text-center">
-            <MailCheck className="mx-auto text-emerald-600" size={30} />
-            <p className="mt-3 font-medium">Conta criada com sucesso</p>
-            <p className="mt-1 text-sm text-muted-foreground">Seu cadastro está pronto. Você já pode entrar e começar a se organizar.</p>
-            <Link href="/" className="button-primary mt-5 w-full">Ir para login</Link>
-          </div>
-        ) : <>
         <input
           type="text"
           name="nome"
@@ -162,9 +160,8 @@ export default function CadastroPage() {
         >
           {loading ? "Criando..." : "Criar Conta"}
         </button>
-        </>}
 
-        {!emailEnviado && <div className="mt-6 text-center">
+        <div className="mt-6 text-center">
           <p className="text-muted-foreground">
             Já tem conta?
           </p>
@@ -175,7 +172,7 @@ export default function CadastroPage() {
           >
             Entrar
           </Link>
-        </div>}
+        </div>
       </form>
     </div>
   );

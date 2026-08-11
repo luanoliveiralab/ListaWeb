@@ -197,12 +197,26 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         }
 
         limparTentativas(req);
-
-        return res.status(201).json({
+        const resposta = {
             mensagem: exigeConfirmacaoEmail ? "Usuário criado. Confirme seu e-mail para entrar." : "Usuário criado. Você já pode entrar.",
             email: usuario.email,
             email_verification_required: exigeConfirmacaoEmail,
-        });
+        };
+
+        if (!exigeConfirmacaoEmail) {
+            const token = jwt.sign(
+                { id: usuario.id, v: 0 },
+                process.env.JWT_SECRET,
+                { expiresIn: "8h" }
+            );
+            res.cookie("listaweb_token", token, cookieOptions());
+            const csrfToken = criarTokenCsrf();
+            res.cookie("listaweb_csrf", csrfToken, csrfCookieOptions());
+            resposta.csrfToken = csrfToken;
+            resposta.usuario = usuario;
+        }
+
+        return res.status(201).json(resposta);
     } catch (err) {
         if (usuarioIdCriado) {
             await pool.query("DELETE FROM usuarios WHERE id = $1", [usuarioIdCriado]).catch(() => undefined);

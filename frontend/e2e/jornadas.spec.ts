@@ -76,6 +76,23 @@ test("mostra o aviso retornado quando o login falha", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("entra no dashboard imediatamente após criar a conta", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/cadastro");
+  await page.getByPlaceholder("Nome").fill("Luan Oliveira");
+  await page.getByPlaceholder("E-mail").fill("luan@example.com");
+  await page.getByPlaceholder("Senha", { exact: true }).fill("senha-segura-123");
+  await page.getByPlaceholder("Confirmar senha").fill("senha-segura-123");
+
+  await page.getByRole("button", { name: "Ler Termos de Uso e Privacidade" }).click();
+  await page.getByTestId("registration-terms-content").evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  await page.getByRole("button", { name: "Li e aceito" }).click();
+  await page.getByRole("button", { name: "Criar Conta" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+});
+
 test("renova o token de segurança e repete a alteração uma única vez", async ({ page }) => {
   await prepararApi(page);
   let tentativas = 0;
