@@ -13,6 +13,11 @@ const FOCUSABLE = [
 
 export function useAccessibleDialog(aberto: boolean, onFechar: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onFecharRef = useRef(onFechar);
+
+  useEffect(() => {
+    onFecharRef.current = onFechar;
+  }, [onFechar]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -33,7 +38,7 @@ export function useAccessibleDialog(aberto: boolean, onFechar: () => void) {
 
       if (event.key === "Escape") {
         event.preventDefault();
-        onFechar();
+        onFecharRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -63,7 +68,7 @@ export function useAccessibleDialog(aberto: boolean, onFechar: () => void) {
       document.body.style.overflow = overflowAnterior;
       focoAnterior?.focus();
     };
-  }, [aberto, onFechar]);
+  }, [aberto]);
 
   return panelRef;
 }

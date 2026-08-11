@@ -325,6 +325,10 @@ test("mantém o modal de categorias organizado no desktop e no mobile", async ({
     await expect(lista).toBeVisible();
     await page.getByRole("tab", { name: "Nova categoria" }).click();
     await expect(page.getByRole("heading", { name: "Nova categoria" })).toBeVisible();
+    const campoNome = page.getByLabel("Nome");
+    await campoNome.fill("Pets");
+    await expect(campoNome).toHaveValue("Pets");
+    await expect(campoNome).toBeFocused();
   }
 });
 
