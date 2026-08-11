@@ -7,6 +7,7 @@ export interface DashboardData {
   lista: ItemLista[];
   movimentacoes: Movimentacao[];
   cartoes: Cartao[];
+  saldo_anterior: number;
 }
 
 export const dashboardService = {

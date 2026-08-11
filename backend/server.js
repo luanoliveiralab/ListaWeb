@@ -1494,7 +1494,7 @@ app.get("/dashboard", autenticar, async (req, res) => {
     }
 
     try {
-        const [lista, movimentacoes, cartoes] = await Promise.all([
+        const [lista, movimentacoes, cartoes, saldoAnterior] = await Promise.all([
             pool.query(
                 `SELECT
                     id, nome, quantidade, categoria, valor,
@@ -1537,12 +1537,22 @@ app.get("/dashboard", autenticar, async (req, res) => {
                  ORDER BY c.created_at DESC, c.id DESC`,
                 [req.usuarioId]
             ),
+            pool.query(
+                `SELECT COALESCE(SUM(CASE
+                    WHEN tipo = 'receita' THEN valor
+                    WHEN tipo = 'despesa' AND forma_pagamento = 'saldo' THEN -valor
+                    ELSE 0 END), 0)::numeric(12,2) AS saldo
+                 FROM movimentacoes
+                 WHERE usuario_id = $1 AND data < make_date($2, $3, 1)`,
+                [req.usuarioId, ano, mes]
+            ),
         ]);
 
         return res.json({
             lista: lista.rows,
             movimentacoes: movimentacoes.rows,
             cartoes: cartoes.rows,
+            saldo_anterior: saldoAnterior.rows[0].saldo,
         });
     } catch (err) {
         console.error("Erro ao carregar dashboard:", err);

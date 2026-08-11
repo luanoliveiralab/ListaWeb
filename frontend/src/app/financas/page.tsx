@@ -83,6 +83,7 @@ export default function FinancasPage() {
     } = usePeriod();
 
     const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
+    const historicoKey = ["financas-historico", usuario?.id] as const;
     const cartoesKey = ["cartoes", usuario?.id] as const;
     const programadasKey = ["movimentacoes-programadas", usuario?.id] as const;
     const recorrenciasKey = ["recorrencias", usuario?.id] as const;
@@ -95,6 +96,11 @@ export default function FinancasPage() {
     const cartoesQuery = useQuery<Cartao[]>({
         queryKey: cartoesKey,
         queryFn: cartoesService.listar,
+        enabled: Boolean(usuario?.id),
+    });
+    const historicoQuery = useQuery<Movimentacao[]>({
+        queryKey: historicoKey,
+        queryFn: () => financasService.buscarPorUsuario(usuario!.id),
         enabled: Boolean(usuario?.id),
     });
     const programadasQuery = useQuery<MovimentacaoProgramada[]>({
@@ -113,6 +119,7 @@ export default function FinancasPage() {
         enabled: Boolean(usuario?.id),
     });
     const movimentacoes = movimentacoesQuery.data ?? [];
+    const historicoMovimentacoes = historicoQuery.data ?? [];
     const cartoes = cartoesQuery.data ?? [];
     const programadas = programadasQuery.data ?? [];
     const recorrencias = recorrenciasQuery.data ?? [];
@@ -409,12 +416,16 @@ export default function FinancasPage() {
     const entradasNoSaldo = movimentacoesFiltradas
         .filter((m) => m.tipo === "receita")
         .reduce((total, m) => total + Number(m.valor), 0);
-    const saldo = entradasNoSaldo - despesasNoSaldo;
+    const inicioPeriodo = `${ano}-${String(mes).padStart(2, "0")}-01`;
+    const saldoAnterior = historicoMovimentacoes
+        .filter((mov) => mov.data.slice(0, 10) < inicioPeriodo)
+        .reduce((total, mov) => total + (mov.tipo === "receita" ? Number(mov.valor) : (mov.forma_pagamento ?? "saldo") === "saldo" ? -Number(mov.valor) : 0), 0);
+    const saldo = saldoAnterior + entradasNoSaldo - despesasNoSaldo;
 
     const dataMesAnterior = new Date(ano, mes - 2, 1);
     const mesAnterior = dataMesAnterior.getMonth() + 1;
     const anoAnterior = dataMesAnterior.getFullYear();
-    const movimentacoesAnteriores = movimentacoes.filter((mov) => {
+    const movimentacoesAnteriores = historicoMovimentacoes.filter((mov) => {
         const [anoMov, mesMov] = mov.data.slice(0, 10).split("-").map(Number);
         return mesMov === mesAnterior && anoMov === anoAnterior;
     });
@@ -425,13 +436,6 @@ export default function FinancasPage() {
     const despesasAnteriores = movimentacoesAnaliticasAnteriores
         .filter((mov) => mov.tipo === "despesa")
         .reduce((total, mov) => total + Number(mov.valor), 0);
-    const despesasSaldoAnteriores = movimentacoesAnteriores
-        .filter((mov) => mov.tipo === "despesa" && (mov.forma_pagamento ?? "saldo") === "saldo")
-        .reduce((total, mov) => total + Number(mov.valor), 0);
-    const entradasSaldoAnteriores = movimentacoesAnteriores
-        .filter((mov) => mov.tipo === "receita")
-        .reduce((total, mov) => total + Number(mov.valor), 0);
-
     return (
         <AppLayout
             titulo="Finanças"
@@ -445,7 +449,7 @@ export default function FinancasPage() {
                 anterior={{
                     receitas: receitasAnteriores,
                     despesas: despesasAnteriores,
-                    saldo: entradasSaldoAnteriores - despesasSaldoAnteriores,
+                    saldo: saldoAnterior,
                 }}
             />
 

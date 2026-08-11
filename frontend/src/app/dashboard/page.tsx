@@ -92,7 +92,7 @@ export default function Dashboard() {
   const entradasNoSaldo = movimentacoesFiltradas
     .filter((mov) => mov.tipo === "receita")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
-  const saldo = entradasNoSaldo - despesasNoSaldo;
+  const saldo = Number(data?.saldo_anterior ?? 0) + entradasNoSaldo - despesasNoSaldo;
 
   const quantidadeMovimentacoes =
     movimentacoesFiltradas.length;
