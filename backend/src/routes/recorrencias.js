@@ -112,11 +112,19 @@ router.post("/gerar", async (req, res, next) => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
+        await client.query(
+            `DELETE FROM movimentacoes
+             WHERE usuario_id = $1
+               AND recorrencia_id IS NOT NULL
+               AND data > CURRENT_DATE`,
+            [req.usuarioId]
+        );
         const programadas = await client.query(
             `SELECT *, make_date($2, $3, dia) AS data_programada
              FROM recorrencias WHERE usuario_id = $1 AND ativa = TRUE
                AND make_date($2, $3, dia) >= inicio
                AND (fim IS NULL OR make_date($2, $3, dia) <= fim)
+               AND make_date($2, $3, dia) <= CURRENT_DATE
              ORDER BY dia, id FOR UPDATE`,
             [req.usuarioId, ano, mes]
         );

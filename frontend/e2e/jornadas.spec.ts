@@ -349,7 +349,7 @@ test("mantém o modal de categorias organizado no desktop e no mobile", async ({
   }
 });
 
-test("programa uma despesa mensal no crédito pela página de finanças", async ({ page }) => {
+test("programa uma despesa única no crédito pela página de finanças", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/");
   await page.getByPlaceholder("E-mail").fill(usuario.email);
@@ -357,9 +357,10 @@ test("programa uma despesa mensal no crédito pela página de finanças", async 
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.goto("/financas");
 
-  await page.getByRole("button", { name: "Programar mensalmente" }).click();
-  await page.getByPlaceholder("Ex.: Aluguel").fill("Assinatura mensal");
+  await page.getByRole("button", { name: "Programar movimentação" }).click();
+  await page.getByPlaceholder("Ex.: Consulta médica").fill("Consulta médica");
   await page.getByPlaceholder("R$ 0,00").last().fill("45,90");
+  await page.getByLabel("Data programada").fill("2026-12-10");
   await page.getByLabel("Categoria").click();
   await page.getByRole("option", { name: "Mercado" }).click();
   await page.getByLabel("Como será pago").click();
@@ -368,7 +369,7 @@ test("programa uma despesa mensal no crédito pela página de finanças", async 
   await page.getByRole("option", { name: /Principal.*Nubank/ }).click();
   await page.getByRole("button", { name: "Programar movimentação" }).click();
 
-  await expect(page.getByText("Movimentação mensal programada.")).toBeVisible();
+  await expect(page.getByText("Movimentação programada.")).toBeVisible();
 });
 
 test("edita uma programação mensal existente", async ({ page }) => {

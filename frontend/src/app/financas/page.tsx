@@ -416,9 +416,9 @@ export default function FinancasPage() {
             />
 
             <ScheduledMovementsPanel
+                usuarioId={usuario.id}
                 cartoes={cartoes}
-                onCriada={() => {
-                    queryClient.invalidateQueries({ queryKey: ["recorrencias", usuario?.id] });
+                onProgramada={() => {
                     queryClient.invalidateQueries({ queryKey: movimentacoesKey });
                     atualizarDashboard();
                 }}
