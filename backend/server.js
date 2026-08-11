@@ -36,6 +36,8 @@ app.disable("x-powered-by");
 // =====================================================
 
 const PORT = process.env.PORT || 3001;
+// Mantido como configuração para reativar a confirmação sem alterar o código.
+const exigeConfirmacaoEmail = process.env.EMAIL_CONFIRMATION_REQUIRED === "true";
 
 if (!process.env.JWT_SECRET || (process.env.NODE_ENV === "production" && process.env.JWT_SECRET.length < 32)) {
     console.error("JWT_SECRET deve estar definido e ter ao menos 32 caracteres em produção.");
@@ -164,12 +166,13 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO usuarios (nome, email, senha, email_verificado, termos_aceitos_em, termos_versao)
-             VALUES ($1, $2, $3, FALSE, NOW(), $4)
+             VALUES ($1, $2, $3, $4, NOW(), $5)
              RETURNING id, nome, email, foto`,
             [
                 nomeLimpo,
                 emailLimpo,
                 senhaHash,
+                !exigeConfirmacaoEmail,
                 versaoTermos,
             ]
         );
@@ -177,25 +180,28 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         const usuario = result.rows[0];
         usuarioIdCriado = usuario.id;
 
-        const tokenVerificacao = crypto.randomBytes(32).toString("hex");
-        const tokenHash = crypto.createHash("sha256").update(tokenVerificacao).digest("hex");
-        await pool.query(
-            `INSERT INTO verificacoes_email (usuario_id, token_hash, expira_em)
-             VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-            [usuario.id, tokenHash]
-        );
-        const frontendUrl = frontendUrlPrincipal();
-        await enviarEmailVerificacao({
-            destinatario: usuario.email,
-            nome: usuario.nome,
-            link: `${frontendUrl}/verificar-email?token=${tokenVerificacao}`,
-        });
+        if (exigeConfirmacaoEmail) {
+            const tokenVerificacao = crypto.randomBytes(32).toString("hex");
+            const tokenHash = crypto.createHash("sha256").update(tokenVerificacao).digest("hex");
+            await pool.query(
+                `INSERT INTO verificacoes_email (usuario_id, token_hash, expira_em)
+                 VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+                [usuario.id, tokenHash]
+            );
+            const frontendUrl = frontendUrlPrincipal();
+            await enviarEmailVerificacao({
+                destinatario: usuario.email,
+                nome: usuario.nome,
+                link: `${frontendUrl}/verificar-email?token=${tokenVerificacao}`,
+            });
+        }
 
         limparTentativas(req);
 
         return res.status(201).json({
-            mensagem: "Usuário criado.",
+            mensagem: exigeConfirmacaoEmail ? "Usuário criado. Confirme seu e-mail para entrar." : "Usuário criado. Você já pode entrar.",
             email: usuario.email,
+            email_verification_required: exigeConfirmacaoEmail,
         });
     } catch (err) {
         if (usuarioIdCriado) {
@@ -309,7 +315,7 @@ app.post("/login", limitarTentativas(), async (req, res) => {
             });
         }
 
-        if (!user.email_verificado) {
+        if (exigeConfirmacaoEmail && !user.email_verificado) {
             return res.status(403).json({ mensagem: "Confirme seu e-mail antes de entrar." });
         }
 

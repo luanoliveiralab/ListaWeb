@@ -110,8 +110,9 @@ export default function CadastroPage() {
         {emailEnviado ? (
           <div className="rounded-2xl bg-emerald-500/10 p-5 text-center">
             <MailCheck className="mx-auto text-emerald-600" size={30} />
-            <p className="mt-3 font-medium">Confirme seu e-mail</p>
-            <p className="mt-1 text-sm text-muted-foreground">Enviamos um link para <strong>{emailEnviado}</strong>. Abra-o para ativar sua conta.</p>
+            <p className="mt-3 font-medium">Conta criada com sucesso</p>
+            <p className="mt-1 text-sm text-muted-foreground">Seu cadastro está pronto. Você já pode entrar e começar a se organizar.</p>
+            <Link href="/" className="button-primary mt-5 w-full">Ir para login</Link>
           </div>
         ) : <>
         <input
@@ -163,7 +164,7 @@ export default function CadastroPage() {
         </button>
         </>}
 
-        <div className="mt-6 text-center">
+        {!emailEnviado && <div className="mt-6 text-center">
           <p className="text-muted-foreground">
             Já tem conta?
           </p>
@@ -174,7 +175,7 @@ export default function CadastroPage() {
           >
             Entrar
           </Link>
-        </div>
+        </div>}
       </form>
     </div>
   );

@@ -81,7 +81,7 @@ O projeto nasceu para transformar tarefas financeiras cotidianas em uma experiê
 
 ### Conta e perfil
 
-- cadastro com verificação de e-mail;
+- cadastro com confirmação de e-mail opcional por configuração;
 - validação de e-mail;
 - recuperação e redefinição de senha;
 - aceite obrigatório dos Termos de Uso e Privacidade;
