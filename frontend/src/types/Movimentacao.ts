@@ -27,4 +27,5 @@ export interface Movimentacao {
     pendente?: boolean;
     programada_id?: number;
     recorrencia_id?: number | null;
+    recorrencia_pendente?: boolean;
 }

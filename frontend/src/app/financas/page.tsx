@@ -32,6 +32,7 @@ import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import type { Orcamento } from "@/types/Orcamento";
 import { orcamentosService } from "@/services/orcamentos.service";
 import { useBudgetThresholdAlerts } from "@/hooks/useBudgetThresholdAlerts";
+import type { Recorrencia } from "@/types/Planejamento";
 
 interface MovimentacaoProgramada {
     id: number;
@@ -84,6 +85,7 @@ export default function FinancasPage() {
     const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
     const cartoesKey = ["cartoes", usuario?.id] as const;
     const programadasKey = ["movimentacoes-programadas", usuario?.id] as const;
+    const recorrenciasKey = ["recorrencias", usuario?.id] as const;
     const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
     const movimentacoesQuery = useQuery<Movimentacao[]>({
         queryKey: movimentacoesKey,
@@ -100,6 +102,11 @@ export default function FinancasPage() {
         queryFn: async () => (await financasService.buscarProgramadas()) as MovimentacaoProgramada[],
         enabled: Boolean(usuario?.id),
     });
+    const recorrenciasQuery = useQuery<Recorrencia[]>({
+        queryKey: recorrenciasKey,
+        queryFn: planejamentoService.buscarRecorrencias,
+        enabled: Boolean(usuario?.id),
+    });
     const orcamentosQuery = useQuery<Orcamento[]>({
         queryKey: orcamentosKey,
         queryFn: () => orcamentosService.buscar(usuario!.id, mes, ano),
@@ -108,6 +115,7 @@ export default function FinancasPage() {
     const movimentacoes = movimentacoesQuery.data ?? [];
     const cartoes = cartoesQuery.data ?? [];
     const programadas = programadasQuery.data ?? [];
+    const recorrencias = recorrenciasQuery.data ?? [];
     const orcamentos = orcamentosQuery.data ?? [];
     const loading = movimentacoesQuery.isPending;
     const carregandoCartoes = cartoesQuery.isPending;
@@ -362,7 +370,25 @@ export default function FinancasPage() {
             pendente: true,
             programada_id: mov.id,
         }));
-    const movimentacoesDaLista = [...movimentacoesFiltradas, ...movimentacoesPendentes];
+    const recorrenciasPendentes = recorrencias
+        .filter((recorrencia) => recorrencia.ativa && !movimentacoes.some((mov) => mov.recorrencia_id === recorrencia.id))
+        .map<Movimentacao>((recorrencia) => ({
+            id: -1_000_000_000 - recorrencia.id,
+            usuario_id: usuario.id,
+            tipo: recorrencia.tipo,
+            descricao: recorrencia.descricao,
+            valor: Number(recorrencia.valor),
+            categoria: recorrencia.categoria,
+            data: `${ano}-${String(mes).padStart(2, "0")}-${String(recorrencia.dia).padStart(2, "0")}`,
+            created_at: new Date().toISOString(),
+            forma_pagamento: recorrencia.forma_pagamento,
+            cartao_id: recorrencia.cartao_id,
+            cartao_nome: recorrencia.cartao_id ? cartoes.find((cartao) => cartao.id === recorrencia.cartao_id)?.nome ?? null : null,
+            pendente: true,
+            recorrencia_pendente: true,
+            recorrencia_id: recorrencia.id,
+        }));
+    const movimentacoesDaLista = [...movimentacoesFiltradas, ...movimentacoesPendentes, ...recorrenciasPendentes];
 
     const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id && mov.impacta_resultado !== false);
     const receitas = movimentacoesAnaliticas

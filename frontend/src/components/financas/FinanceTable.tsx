@@ -224,7 +224,7 @@ export default function FinanceTable({
                                                     {movimentacao.categoria}
                                                 </span>
                                                 {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
-                                                {movimentacao.pendente && <span className="rounded-full bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-300">Programada</span>}
+                                                {movimentacao.pendente && <span className="rounded-full bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-300">{movimentacao.recorrencia_pendente ? "Recorrência" : "Programada"}</span>}
                                                 {movimentacao.tipo === "despesa" && (
                                                     <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                         {movimentacao.forma_pagamento === "credito"
@@ -248,7 +248,7 @@ export default function FinanceTable({
                                     </div>
                                 </div>
 
-                                {!transferencia && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                                {!transferencia && !movimentacao.recorrencia_pendente && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                                     {!movimentacao.pendente && <button
                                         type="button"
                                         onClick={() => onEditar(movimentacao)}
