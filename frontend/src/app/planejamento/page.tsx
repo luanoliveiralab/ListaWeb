@@ -178,6 +178,14 @@ export default function PlanejamentoPage() {
 
   const metasConcluidas = metas.filter((item) => item.concluida).length;
   const recorrenciasAtivas = recorrencias.filter((item) => item.ativa).length;
+  const recorrenciasRealizadas = recorrencias.filter((item) => item.ativa && movimentacoes.some((mov) => mov.recorrencia_id === item.id));
+  const recorrenciasPendentes = recorrencias.filter((item) => item.ativa && !movimentacoes.some((mov) => mov.recorrencia_id === item.id));
+  const recorrenciasPausadas = recorrencias.filter((item) => !item.ativa);
+  const gruposRecorrencia = [
+    { titulo: "Realizadas", itens: recorrenciasRealizadas, className: "bg-muted/40 text-muted-foreground", detalhe: "Lançadas neste período" },
+    { titulo: "Pendentes / futuras", itens: recorrenciasPendentes, className: "bg-amber-500/5 text-amber-700 dark:text-amber-300", detalhe: "Ainda não afetam o saldo" },
+    { titulo: "Pausadas", itens: recorrenciasPausadas, className: "bg-muted/40 text-muted-foreground", detalhe: "Sem lançamento programado" },
+  ];
 
   return (
     <AppLayout titulo="Planejamento" subtitulo="Automatize lançamentos e acompanhe seus objetivos." nome={usuario.nome}>
@@ -219,7 +227,9 @@ export default function PlanejamentoPage() {
           </form>}
 
           <div className="planning-list">
-            {recorrencias.map((item) => {
+            {gruposRecorrencia.map((grupo) => grupo.itens.length > 0 && <div key={grupo.titulo}>
+              <div className={`flex items-center justify-between px-1 py-3 text-xs font-semibold uppercase tracking-wider ${grupo.className}`}><span>{grupo.titulo}</span><span className="normal-case tracking-normal">{grupo.detalhe}</span></div>
+            {grupo.itens.map((item) => {
               const TipoIcon = item.tipo === "receita" ? TrendingUp : TrendingDown;
               return <article key={item.id} className={`planning-row ${!item.ativa ? "planning-row-muted" : ""}`}>
                 <span className={`planning-kind ${item.tipo}`}><TipoIcon size={18} /></span>
@@ -227,7 +237,7 @@ export default function PlanejamentoPage() {
                 <strong className={item.tipo === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{item.tipo === "receita" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong>
                 <div className="flex gap-1"><button type="button" className="icon-button" aria-label={`Editar recorrência ${item.descricao}`} onClick={() => { setRec({ tipo: item.tipo, descricao: item.descricao, valor: String(item.valor), categoria: item.categoria, dia: String(item.dia), forma_pagamento: item.forma_pagamento ?? "saldo", cartao_id: item.cartao_id ? String(item.cartao_id) : "" }); setRecorrenciaEditando(item); setRecorrenciaAberta(true); }}><Pencil size={17} /></button><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label={`Excluir recorrência ${item.descricao}`} onClick={() => setExclusao({ tipo: "recorrencia", item })}><Trash2 size={17} /></button></div>
               </article>;
-            })}
+            })}</div>)}
             {!recorrencias.length && <p className="empty-state">Nenhuma recorrência cadastrada.</p>}
           </div>
         </section>

@@ -26,4 +26,5 @@ export interface Movimentacao {
     parcelas_total?: number | null;
     pendente?: boolean;
     programada_id?: number;
+    recorrencia_id?: number | null;
 }
