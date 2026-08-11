@@ -1802,6 +1802,10 @@ app.put(
                 await client.query("ROLLBACK");
                 return res.status(409).json({ mensagem: "O pagamento de uma fatura não pode ser alterado." });
             }
+            if (movimentacao.meta_movimentacao_id) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "Transferências de metas devem ser alteradas em Planejamento." });
+            }
             if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
                 await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);
                 const faturaProtegida = await client.query(
@@ -2001,7 +2005,7 @@ app.delete(
 
             const movimentacaoResult =
                 await client.query(
-                    `SELECT usuario_id, forma_pagamento, cartao_id, data, fatura_pagamento_id
+                    `SELECT usuario_id, forma_pagamento, cartao_id, data, fatura_pagamento_id, meta_movimentacao_id
                      FROM movimentacoes
                      WHERE id = $1
                      FOR UPDATE`,
@@ -2044,6 +2048,10 @@ app.delete(
             if (movimentacao.fatura_pagamento_id) {
                 await client.query("ROLLBACK");
                 return res.status(409).json({ mensagem: "O pagamento de uma fatura não pode ser excluído." });
+            }
+            if (movimentacao.meta_movimentacao_id) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "Transferências de metas devem ser gerenciadas em Planejamento." });
             }
             if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
                 await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);

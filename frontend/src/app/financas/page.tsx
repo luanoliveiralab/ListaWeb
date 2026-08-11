@@ -312,11 +312,11 @@ export default function FinancasPage() {
         );
     });
 
-    const receitas = movimentacoesFiltradas
+    const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id && mov.impacta_resultado !== false);
+    const receitas = movimentacoesAnaliticas
         .filter((m) => m.tipo === "receita")
         .reduce((total, m) => total + Number(m.valor), 0);
 
-    const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id);
     const despesas = movimentacoesAnaliticas
         .filter((m) => m.tipo === "despesa")
         .reduce((total, m) => total + Number(m.valor), 0);
@@ -324,7 +324,10 @@ export default function FinancasPage() {
     const despesasNoSaldo = movimentacoesFiltradas
         .filter((m) => m.tipo === "despesa" && (m.forma_pagamento ?? "saldo") === "saldo")
         .reduce((total, m) => total + Number(m.valor), 0);
-    const saldo = receitas - despesasNoSaldo;
+    const entradasNoSaldo = movimentacoesFiltradas
+        .filter((m) => m.tipo === "receita")
+        .reduce((total, m) => total + Number(m.valor), 0);
+    const saldo = entradasNoSaldo - despesasNoSaldo;
 
     const dataMesAnterior = new Date(ano, mes - 2, 1);
     const mesAnterior = dataMesAnterior.getMonth() + 1;
@@ -333,15 +336,18 @@ export default function FinancasPage() {
         const [anoMov, mesMov] = mov.data.slice(0, 10).split("-").map(Number);
         return mesMov === mesAnterior && anoMov === anoAnterior;
     });
-    const receitasAnteriores = movimentacoesAnteriores
+    const movimentacoesAnaliticasAnteriores = movimentacoesAnteriores.filter((mov) => !mov.fatura_pagamento_id && mov.impacta_resultado !== false);
+    const receitasAnteriores = movimentacoesAnaliticasAnteriores
         .filter((mov) => mov.tipo === "receita")
         .reduce((total, mov) => total + Number(mov.valor), 0);
-    const despesasAnteriores = movimentacoesAnteriores
-        .filter((mov) => !mov.fatura_pagamento_id)
+    const despesasAnteriores = movimentacoesAnaliticasAnteriores
         .filter((mov) => mov.tipo === "despesa")
         .reduce((total, mov) => total + Number(mov.valor), 0);
     const despesasSaldoAnteriores = movimentacoesAnteriores
         .filter((mov) => mov.tipo === "despesa" && (mov.forma_pagamento ?? "saldo") === "saldo")
+        .reduce((total, mov) => total + Number(mov.valor), 0);
+    const entradasSaldoAnteriores = movimentacoesAnteriores
+        .filter((mov) => mov.tipo === "receita")
         .reduce((total, mov) => total + Number(mov.valor), 0);
 
     return (
@@ -357,7 +363,7 @@ export default function FinancasPage() {
                 anterior={{
                     receitas: receitasAnteriores,
                     despesas: despesasAnteriores,
-                    saldo: receitasAnteriores - despesasSaldoAnteriores,
+                    saldo: entradasSaldoAnteriores - despesasSaldoAnteriores,
                 }}
             />
 

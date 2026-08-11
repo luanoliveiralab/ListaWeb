@@ -104,6 +104,10 @@ CREATE TABLE IF NOT EXISTS meta_movimentacoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS impacta_resultado BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS meta_movimentacao_id
+    INTEGER UNIQUE REFERENCES meta_movimentacoes(id) ON DELETE CASCADE;
+
 CREATE TABLE IF NOT EXISTS cartoes (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -165,6 +169,8 @@ CREATE INDEX IF NOT EXISTS idx_metas_usuario ON metas(usuario_id, concluida);
 CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario ON recuperacoes_senha(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_verificacoes_email_usuario ON verificacoes_email(usuario_id, expira_em DESC);
 CREATE INDEX IF NOT EXISTS idx_meta_movimentacoes_meta ON meta_movimentacoes(meta_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_meta ON movimentacoes(meta_movimentacao_id)
+    WHERE meta_movimentacao_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cartoes_usuario ON cartoes(usuario_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_faturas_cartao_periodo ON faturas_cartao(cartao_id, ano DESC, mes DESC);
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_fatura_pagamento ON movimentacoes(fatura_pagamento_id)

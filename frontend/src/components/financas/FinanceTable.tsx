@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
     ArrowDownRight,
+    ArrowLeftRight,
     ArrowUpRight,
     Pencil,
     Printer,
@@ -21,7 +22,7 @@ interface Props {
     onCategoriaChange?: (categoria: string) => void;
 }
 
-type Filtro = "todas" | "receita" | "despesa";
+type Filtro = "todas" | "receita" | "despesa" | "transferencia";
 
 const formatarValor = (valor: number) =>
     valor.toLocaleString("pt-BR", {
@@ -43,8 +44,9 @@ export default function FinanceTable({
         const termo = pesquisa.trim().toLocaleLowerCase("pt-BR");
 
         return movimentacoes.filter((movimentacao) => {
-            const correspondeAoTipo =
-                filtro === "todas" || movimentacao.tipo === filtro;
+            const transferencia = movimentacao.impacta_resultado === false;
+            const correspondeAoTipo = filtro === "todas"
+                || (filtro === "transferencia" ? transferencia : !transferencia && movimentacao.tipo === filtro);
             const correspondeAoTermo =
                 !termo ||
                 movimentacao.descricao.toLocaleLowerCase("pt-BR").includes(termo) ||
@@ -55,14 +57,17 @@ export default function FinanceTable({
         });
     }, [categoriaSelecionada, filtro, movimentacoes, pesquisa]);
 
-    const resumo = movimentacoesVisiveis.reduce(
+    const resumo = movimentacoesVisiveis.filter((mov) => mov.impacta_resultado !== false).reduce(
         (acc, mov) => {
             acc[mov.tipo === "receita" ? "receitas" : "despesas"] += Number(mov.valor);
             return acc;
         },
         { receitas: 0, despesas: 0 }
     );
-    const saldoRelatorio = resumo.receitas - resumo.despesas;
+    const impactoTransferencias = movimentacoesVisiveis
+        .filter((mov) => mov.impacta_resultado === false)
+        .reduce((total, mov) => total + (mov.tipo === "receita" ? Number(mov.valor) : -Number(mov.valor)), 0);
+    const saldoRelatorio = resumo.receitas - resumo.despesas + impactoTransferencias;
     const filtrosAtivos = [
         filtro !== "todas" ? `Tipo: ${filtro}` : "",
         categoriaSelecionada ? `Categoria: ${categoriaSelecionada}` : "",
@@ -79,9 +84,10 @@ export default function FinanceTable({
     }
 
     const quantidadeReceitas = movimentacoes.filter(
-        (movimentacao) => movimentacao.tipo === "receita"
+        (movimentacao) => movimentacao.impacta_resultado !== false && movimentacao.tipo === "receita"
     ).length;
-    const quantidadeDespesas = movimentacoes.length - quantidadeReceitas;
+    const quantidadeDespesas = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado !== false && movimentacao.tipo === "despesa").length;
+    const quantidadeTransferencias = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado === false).length;
 
     if (loading) {
         return (
@@ -137,6 +143,7 @@ export default function FinanceTable({
                         ["todas", "Todas", movimentacoes.length],
                         ["receita", "Receitas", quantidadeReceitas],
                         ["despesa", "Despesas", quantidadeDespesas],
+                        ["transferencia", "Transferências", quantidadeTransferencias],
                     ] as const).map(([valor, rotulo, quantidade]) => (
                         <button
                             key={valor}
@@ -174,6 +181,7 @@ export default function FinanceTable({
                 <div className="divide-y divide-border">
                     {movimentacoesVisiveis.map((movimentacao, index) => {
                         const receita = movimentacao.tipo === "receita";
+                        const transferencia = movimentacao.impacta_resultado === false;
 
                         return (
                             <article
@@ -183,12 +191,16 @@ export default function FinanceTable({
                             >
                                 <div
                                     className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
-                                        receita
+                                        transferencia
+                                            ? "bg-sky-500/10 text-sky-600"
+                                            : receita
                                             ? "bg-emerald-500/10 text-emerald-600"
                                             : "bg-rose-500/10 text-rose-600"
                                     }`}
                                 >
-                                    {receita ? (
+                                    {transferencia ? (
+                                        <ArrowLeftRight size={21} />
+                                    ) : receita ? (
                                         <ArrowUpRight size={21} />
                                     ) : (
                                         <ArrowDownRight size={21} />
@@ -205,6 +217,7 @@ export default function FinanceTable({
                                                 <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                     {movimentacao.categoria}
                                                 </span>
+                                                {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
                                                 {movimentacao.tipo === "despesa" && (
                                                     <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                         {movimentacao.forma_pagamento === "credito"
@@ -220,7 +233,7 @@ export default function FinanceTable({
 
                                         <strong
                                             className={`text-base tabular-nums sm:text-right ${
-                                                receita ? "text-emerald-600" : "text-rose-600"
+                                                transferencia ? "text-sky-700 dark:text-sky-300" : receita ? "text-emerald-600" : "text-rose-600"
                                             }`}
                                         >
                                             {receita ? "+" : "−"} {formatarValor(Number(movimentacao.valor))}
@@ -228,7 +241,7 @@ export default function FinanceTable({
                                     </div>
                                 </div>
 
-                                <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                                {!transferencia && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                                     <button
                                         type="button"
                                         onClick={() => onEditar(movimentacao)}
@@ -245,7 +258,7 @@ export default function FinanceTable({
                                     >
                                         <Trash2 size={17} />
                                     </button>
-                                </div>
+                                </div>}
                             </article>
                         );
                     })}
@@ -294,8 +307,8 @@ export default function FinanceTable({
                                 <td>{new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</td>
                                 <td>{mov.descricao}{mov.quantidade != null ? ` (${mov.quantidade} un.)` : ""}</td>
                                 <td>{mov.categoria}</td>
-                                <td>{mov.tipo === "receita" ? "Receita" : mov.forma_pagamento === "credito" ? `Crédito - ${mov.cartao_nome || "Cartão"}` : "Saldo"}</td>
-                                <td className={`report-number ${mov.tipo === "receita" ? "report-positive" : "report-negative"}`}>
+                                <td>{mov.impacta_resultado === false ? "Transferência de meta" : mov.tipo === "receita" ? "Receita" : mov.forma_pagamento === "credito" ? `Crédito - ${mov.cartao_nome || "Cartão"}` : "Saldo"}</td>
+                                <td className={`report-number ${mov.impacta_resultado === false ? "" : mov.tipo === "receita" ? "report-positive" : "report-negative"}`}>
                                     {mov.tipo === "receita" ? "+" : "-"} {formatarValor(Number(mov.valor))}
                                 </td>
                             </tr>

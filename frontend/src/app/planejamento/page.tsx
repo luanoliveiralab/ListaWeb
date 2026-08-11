@@ -157,6 +157,7 @@ export default function PlanejamentoPage() {
       atualizarMetas((lista) => lista.map((item) => item.id === resposta.meta.id ? resposta.meta : item));
       setMetaSelecionada(resposta.meta);
       setHistorico((lista) => [resposta.movimentacao, ...lista]);
+      sincronizarFinancas();
       setMovimento({ tipo: "deposito", valor: "", observacao: "" });
       mostrarAviso("Valor da meta atualizado.");
     } catch (error) { mostrarAviso(error instanceof Error ? error.message : "Não foi possível atualizar a meta.", "erro"); }

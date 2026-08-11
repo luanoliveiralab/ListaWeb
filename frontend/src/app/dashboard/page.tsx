@@ -77,11 +77,11 @@ export default function Dashboard() {
   });
 
 
-  const receitas = movimentacoesFiltradas
+  const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id && mov.impacta_resultado !== false);
+  const receitas = movimentacoesAnaliticas
     .filter((mov) => mov.tipo === "receita")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
 
-  const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id);
   const despesas = movimentacoesAnaliticas
     .filter((mov) => mov.tipo === "despesa")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
@@ -89,7 +89,10 @@ export default function Dashboard() {
   const despesasNoSaldo = movimentacoesFiltradas
     .filter((mov) => mov.tipo === "despesa" && (mov.forma_pagamento ?? "saldo") === "saldo")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
-  const saldo = receitas - despesasNoSaldo;
+  const entradasNoSaldo = movimentacoesFiltradas
+    .filter((mov) => mov.tipo === "receita")
+    .reduce((acc, mov) => acc + Number(mov.valor), 0);
+  const saldo = entradasNoSaldo - despesasNoSaldo;
 
   const quantidadeMovimentacoes =
     movimentacoesFiltradas.length;

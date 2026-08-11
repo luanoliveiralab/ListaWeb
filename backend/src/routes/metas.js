@@ -94,8 +94,18 @@ router.post("/:id/movimentar", async (req, res, next) => {
             "INSERT INTO meta_movimentacoes (meta_id, usuario_id, tipo, valor, observacao) VALUES ($1,$2,$3,$4,$5) RETURNING *",
             [id, req.usuarioId, tipo, valorNumero, observacao?.trim() || null]
         );
+        const descricaoFinanceira = tipo === "deposito"
+            ? `Reserva para meta: ${meta.rows[0].nome}`
+            : `Resgate da meta: ${meta.rows[0].nome}`;
+        const movimentacaoFinanceira = await client.query(
+            `INSERT INTO movimentacoes
+                (usuario_id, tipo, descricao, valor, categoria, data, forma_pagamento, impacta_resultado, meta_movimentacao_id)
+             VALUES ($1, $2, $3, $4, 'Metas', CURRENT_DATE, 'saldo', FALSE, $5)
+             RETURNING *`,
+            [req.usuarioId, tipo === "deposito" ? "despesa" : "receita", descricaoFinanceira, valorNumero, movimento.rows[0].id]
+        );
         await client.query("COMMIT");
-        return res.json({ meta: atualizada.rows[0], movimentacao: movimento.rows[0] });
+        return res.json({ meta: atualizada.rows[0], movimentacao: movimento.rows[0], movimentacao_financeira: movimentacaoFinanceira.rows[0] });
     } catch (error) { await client.query("ROLLBACK"); return next(error); }
     finally { client.release(); }
 });

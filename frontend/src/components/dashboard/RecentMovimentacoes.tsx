@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowLeftRight, ArrowRight, ArrowUpRight } from "lucide-react";
 
 import type { Movimentacao } from "@/types/Movimentacao";
 
@@ -30,18 +30,19 @@ export default function RecentMovimentacoes({ movimentacoes }: Props) {
         <div className="divide-y divide-border">
           {ultimas.map((mov, index) => {
             const receita = mov.tipo === "receita";
+            const transferencia = mov.impacta_resultado === false;
             return (
               <div key={mov.id} className="transaction-row" style={{ animationDelay: `${index * 40}ms` }}>
-                <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${receita ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
-                  {receita ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${transferencia ? "bg-sky-500/10 text-sky-600" : receita ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                  {transferencia ? <ArrowLeftRight size={20} /> : receita ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{mov.descricao}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {mov.categoria} · {new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
+                    {transferencia ? "Transferência de meta" : mov.categoria} · {new Date(`${mov.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
-                <strong className={`shrink-0 tabular-nums ${receita ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>
+                <strong className={`shrink-0 tabular-nums ${transferencia ? "text-sky-700 dark:text-sky-300" : receita ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>
                   {receita ? "+" : "−"} {Number(mov.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </strong>
               </div>

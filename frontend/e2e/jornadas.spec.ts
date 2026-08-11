@@ -202,6 +202,56 @@ test("avisa uma única vez ao atingir um marco do orçamento", async ({ page }) 
   await expect(page.getByText("Você já utilizou 50% do orçamento de Mercado.")).not.toBeVisible();
 });
 
+test("integra depósitos de metas ao saldo sem distorcer receitas e despesas", async ({ page }) => {
+  await prepararApi(page);
+  let metaMovimentada = false;
+  const hoje = new Date();
+  const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-10`;
+  const base = [
+    { id: 1, usuario_id: 42, tipo: "receita", descricao: "Salário", valor: 5000, categoria: "Salário", data, created_at: hoje.toISOString(), forma_pagamento: "saldo", impacta_resultado: true },
+    { id: 2, usuario_id: 42, tipo: "despesa", descricao: "Mercado", valor: 250, categoria: "Mercado", data, created_at: hoje.toISOString(), forma_pagamento: "saldo", impacta_resultado: true },
+  ];
+  const transferencia = { id: 90, usuario_id: 42, tipo: "despesa", descricao: "Reserva para meta: Reserva", valor: 300, categoria: "Metas", data, created_at: hoje.toISOString(), forma_pagamento: "saldo", impacta_resultado: false, meta_movimentacao_id: 80 };
+
+  await page.route("http://localhost:3001/**", async (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === "/metas/1/historico") return responderJson(route, []);
+    if (pathname === "/metas/1/movimentar" && route.request().method() === "POST") {
+      metaMovimentada = true;
+      return responderJson(route, {
+        meta: { id: 1, nome: "Reserva", valor_alvo: 10000, valor_atual: 1800, prazo: null, concluida: false },
+        movimentacao: { id: 80, tipo: "deposito", valor: 300, observacao: null, created_at: hoje.toISOString() },
+        movimentacao_financeira: transferencia,
+      });
+    }
+    if (pathname === "/recorrencias/gerar") {
+      return responderJson(route, {
+        geradas: 0,
+        movimentacoes: metaMovimentada ? [transferencia, ...base] : base,
+      });
+    }
+    return route.fallback();
+  });
+
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/planejamento");
+  await page.getByRole("button", { name: "Movimentar e ver histórico" }).click();
+  const modal = page.locator(".modal-panel");
+  await modal.locator('input[inputmode="decimal"]').fill("300");
+  await modal.getByRole("button", { name: "Registrar movimentação" }).click();
+  await expect(page.getByText("Valor da meta atualizado.")).toBeVisible();
+
+  await page.goto("/financas");
+  await expect(page.getByRole("heading", { name: "Reserva para meta: Reserva" })).toBeVisible();
+  await expect(page.getByText("Transferência", { exact: true })).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: /^Saldo/ })).toContainText("R$ 4.450,00");
+  await expect(page.locator("article").filter({ hasText: /^Receitas/ })).toContainText("R$ 5.000,00");
+  await expect(page.locator("article").filter({ hasText: /^Despesas/ })).toContainText("R$ 250,00");
+});
+
 test("mantém header e formulário fixos enquanto apenas categorias rolam", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/");

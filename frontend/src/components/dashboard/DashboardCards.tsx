@@ -71,7 +71,7 @@ export default function DashboardCards({
   const despesasCredito = movimentacoesDoPeriodo
     .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito")
     .reduce((soma, mov) => soma + Number(mov.valor), 0);
-  const quantidadeReceitas = movimentacoesDoPeriodo.filter((mov) => mov.tipo === "receita").length;
+  const quantidadeReceitas = movimentacoesDoPeriodo.filter((mov) => mov.tipo === "receita" && mov.impacta_resultado !== false).length;
 
   const cards = [
     { titulo: "Saldo em conta", valor: moeda(saldo), detalhe: "Entradas menos despesas no saldo", Icone: Wallet, cor: saldo >= 0 ? "text-emerald-600" : "text-rose-600", fundo: saldo >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10" },
