@@ -64,11 +64,29 @@ router.post("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
     let id;
     try { id = idPositivo(req.params.id, "ID da recorrência"); } catch (error) { return next(error); }
-    if (typeof req.body.ativa !== "boolean") {
-        return res.status(400).json({ mensagem: "O estado da recorrência deve ser verdadeiro ou falso." });
-    }
     try {
-        const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [req.body.ativa, id, req.usuarioId]);
+        if (typeof req.body.ativa === "boolean" && Object.keys(req.body).length === 1) {
+            const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [req.body.ativa, id, req.usuarioId]);
+            if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
+            return res.json(result.rows[0]);
+        }
+        const { tipo, descricao, valor, categoria, dia, forma_pagamento, cartao_id } = req.body;
+        const valorNumero = Number(valor);
+        if (!['receita', 'despesa'].includes(tipo) || typeof descricao !== 'string' || !descricao.trim() || descricao.trim().length > 255 || typeof categoria !== 'string' || !categoria.trim() || categoria.trim().length > 80 || !Number.isFinite(valorNumero) || valorNumero <= 0 || valorNumero > VALOR_MAXIMO || !Number.isInteger(Number(dia)) || Number(dia) < 1 || Number(dia) > 28 || (forma_pagamento !== undefined && !['saldo', 'credito'].includes(forma_pagamento))) {
+            return res.status(400).json({ mensagem: "Dados da recorrência inválidos." });
+        }
+        const formaPagamento = tipo === 'despesa' && forma_pagamento === 'credito' ? 'credito' : 'saldo';
+        const cartaoId = formaPagamento === 'credito' ? Number(cartao_id) : null;
+        if (formaPagamento === 'credito' && (!Number.isInteger(cartaoId) || cartaoId <= 0)) return res.status(400).json({ mensagem: "Selecione um cartão para a despesa recorrente." });
+        if (cartaoId) {
+            const cartao = await pool.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+            if (!cartao.rowCount) return res.status(400).json({ mensagem: "Cartão inválido." });
+        }
+        const result = await pool.query(
+            `UPDATE recorrencias SET tipo = $1, descricao = $2, valor = $3, categoria = $4, dia = $5, forma_pagamento = $6, cartao_id = $7
+             WHERE id = $8 AND usuario_id = $9 RETURNING *`,
+            [tipo, descricao.trim(), valorNumero, categoria.trim(), Number(dia), formaPagamento, cartaoId, id, req.usuarioId]
+        );
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
         return res.json(result.rows[0]);
     } catch (error) { return next(error); }

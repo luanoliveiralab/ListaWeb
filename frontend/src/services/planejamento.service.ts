@@ -3,6 +3,7 @@ import { api } from "./api";
 export const planejamentoService = {
   buscarRecorrencias: () => api.get("/recorrencias"),
   criarRecorrencia: (dados: unknown) => api.post("/recorrencias", dados),
+  editarRecorrencia: (id: number, dados: unknown) => api.put(`/recorrencias/${id}`, dados),
   alternarRecorrencia: (id: number, ativa: boolean) => api.put(`/recorrencias/${id}`, { ativa }),
   removerRecorrencia: (id: number) => api.delete(`/recorrencias/${id}`),
   gerarRecorrencias: (mes: number, ano: number) => api.post("/recorrencias/gerar", { mes, ano }),

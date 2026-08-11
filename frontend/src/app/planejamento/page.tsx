@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, Pause, Play, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarClock, CheckCircle2, Pause, Pencil, Play, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useUsuario } from "@/hooks/useUsuario";
 import { useToast } from "@/providers/ToastProvider";
@@ -36,6 +36,7 @@ export default function PlanejamentoPage() {
   const [historico, setHistorico] = useState<MetaMovimentacao[]>([]);
   const [movimento, setMovimento] = useState({ tipo: "deposito", valor: "", observacao: "" });
   const [recorrenciaAberta, setRecorrenciaAberta] = useState(false);
+  const [recorrenciaEditando, setRecorrenciaEditando] = useState<Recorrencia | null>(null);
   const [metaAberta, setMetaAberta] = useState(false);
   const [exclusao, setExclusao] = useState<{ tipo: "recorrencia"; item: Recorrencia } | { tipo: "meta"; item: Meta } | null>(null);
   const [excluindo, setExcluindo] = useState(false);
@@ -120,15 +121,19 @@ export default function PlanejamentoPage() {
     finally { setExcluindo(false); }
   }
 
-  async function criarRecorrencia(event: FormEvent) {
+  async function salvarRecorrencia(event: FormEvent) {
     event.preventDefault();
     try {
-      const nova = await planejamentoService.criarRecorrencia({ ...rec, valor: Number(rec.valor.replace(",", ".")), dia: Number(rec.dia) });
-      atualizarRecorrencias((itens) => [nova, ...itens]);
+      const dados = { ...rec, valor: Number(rec.valor.replace(",", ".")), dia: Number(rec.dia) };
+      const salva = recorrenciaEditando
+        ? await planejamentoService.editarRecorrencia(recorrenciaEditando.id, dados)
+        : await planejamentoService.criarRecorrencia(dados);
+      atualizarRecorrencias((itens) => recorrenciaEditando ? itens.map((item) => item.id === salva.id ? salva : item) : [salva, ...itens]);
       sincronizarFinancas();
       setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" });
+      setRecorrenciaEditando(null);
       setRecorrenciaAberta(false);
-      mostrarAviso("Recorrência criada.");
+      mostrarAviso(recorrenciaEditando ? "Recorrência atualizada." : "Recorrência criada.");
     } catch (error) {
       mostrarAviso(error instanceof Error ? error.message : "Dados inválidos.", "erro");
     }
@@ -202,7 +207,7 @@ export default function PlanejamentoPage() {
             <div><h2 className="section-title flex items-center gap-2"><CalendarClock size={21} /> Recorrências mensais</h2><p className="section-description">Cadastre contas e recebimentos que se repetem todos os meses.</p></div>
             {!recorrenciaAberta && <button type="button" onClick={() => setRecorrenciaAberta(true)} className="button-primary shrink-0"><Plus size={17} /> Criar recorrência</button>}
           </div>
-          {recorrenciaAberta && <form onSubmit={criarRecorrencia} className="form-grid animate-in border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300">
+          {recorrenciaAberta && <form onSubmit={salvarRecorrencia} className="form-grid animate-in border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300">
             <div className="field-group"><label className="field-label" htmlFor="tipo-recorrencia">Tipo</label><AppSelect id="tipo-recorrencia" value={rec.tipo} onValueChange={(value) => setRec({ ...rec, tipo: value, categoria: "", forma_pagamento: value === "receita" ? "saldo" : rec.forma_pagamento, cartao_id: value === "receita" ? "" : rec.cartao_id })} options={[{ value: "despesa", label: "Despesa" }, { value: "receita", label: "Receita" }]} /></div>
             <div className="field-group"><label className="field-label" htmlFor="descricao-recorrencia">Descrição</label><input id="descricao-recorrencia" className="control" placeholder="Ex.: Aluguel" value={rec.descricao} onChange={(e) => setRec({ ...rec, descricao: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="valor-recorrencia">Valor (R$)</label><input id="valor-recorrencia" className="control" placeholder="R$ 0,00" inputMode="decimal" value={rec.valor} onChange={(e) => setRec({ ...rec, valor: e.target.value })} required /></div>
@@ -210,7 +215,7 @@ export default function PlanejamentoPage() {
             <div className="field-group"><label className="field-label" htmlFor="dia-recorrencia">Dia do lançamento</label><input id="dia-recorrencia" className="control" type="number" min="1" max="28" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></div>
             {rec.tipo === "despesa" && <div className="field-group"><label className="field-label" htmlFor="pagamento-recorrencia">Como será pago</label><AppSelect id="pagamento-recorrencia" value={rec.forma_pagamento} onValueChange={(value) => setRec({ ...rec, forma_pagamento: value, cartao_id: value === "saldo" ? "" : rec.cartao_id })} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} /></div>}
             {rec.tipo === "despesa" && rec.forma_pagamento === "credito" && <div className="field-group"><label className="field-label" htmlFor="cartao-recorrencia">Cartão</label><AppSelect id="cartao-recorrencia" value={rec.cartao_id} onValueChange={(value) => setRec({ ...rec, cartao_id: value })} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} /></div>}
-            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" }); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Adicionar recorrência</button></div>
+            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" }); setRecorrenciaEditando(null); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> {recorrenciaEditando ? "Salvar alterações" : "Adicionar recorrência"}</button></div>
           </form>}
 
           <div className="planning-list">
@@ -220,7 +225,7 @@ export default function PlanejamentoPage() {
                 <span className={`planning-kind ${item.tipo}`}><TipoIcon size={18} /></span>
                 <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{item.descricao}</strong><span className={`status-pill ${item.ativa ? "active" : "paused"}`}>{item.ativa ? "Ativa" : "Pausada"}</span></div><p className="planning-detail">{item.categoria} <span>•</span> todo dia {item.dia}{item.tipo === "despesa" && <><span>•</span> {item.forma_pagamento === "credito" ? "cartão de crédito" : "saldo"}</>}</p></div>
                 <strong className={item.tipo === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{item.tipo === "receita" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong>
-                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label={`Excluir recorrência ${item.descricao}`} onClick={() => setExclusao({ tipo: "recorrencia", item })}><Trash2 size={17} /></button></div>
+                <div className="flex gap-1"><button type="button" className="icon-button" aria-label={`Editar recorrência ${item.descricao}`} onClick={() => { setRec({ tipo: item.tipo, descricao: item.descricao, valor: String(item.valor), categoria: item.categoria, dia: String(item.dia), forma_pagamento: item.forma_pagamento ?? "saldo", cartao_id: item.cartao_id ? String(item.cartao_id) : "" }); setRecorrenciaEditando(item); setRecorrenciaAberta(true); }}><Pencil size={17} /></button><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label={`Excluir recorrência ${item.descricao}`} onClick={() => setExclusao({ tipo: "recorrencia", item })}><Trash2 size={17} /></button></div>
               </article>;
             })}
             {!recorrencias.length && <p className="empty-state">Nenhuma recorrência cadastrada.</p>}

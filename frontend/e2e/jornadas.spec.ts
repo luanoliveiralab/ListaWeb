@@ -371,6 +371,22 @@ test("programa uma despesa mensal no crédito pela página de finanças", async 
   await expect(page.getByText("Movimentação mensal programada.")).toBeVisible();
 });
 
+test("edita uma programação mensal existente", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/planejamento");
+
+  await page.getByRole("button", { name: "Editar recorrência Aluguel" }).click();
+  await page.getByLabel("Descrição").fill("Aluguel atualizado");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+
+  await expect(page.getByText("Recorrência atualizada.")).toBeVisible();
+  await expect(page.getByText("Aluguel atualizado")).toBeVisible();
+});
+
 test("exibe em cada página somente as categorias configuradas", async ({ page }) => {
   await prepararApi(page);
   await page.route("http://localhost:3001/categorias", (route) => responderJson(route, [
