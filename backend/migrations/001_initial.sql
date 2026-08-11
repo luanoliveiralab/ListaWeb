@@ -181,6 +181,21 @@ ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS forma_pagamento
 ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS cartao_id
     INTEGER REFERENCES cartoes(id) ON DELETE SET NULL;
 
+CREATE TABLE IF NOT EXISTS movimentacoes_programadas (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('receita', 'despesa')),
+    descricao VARCHAR(255) NOT NULL,
+    valor NUMERIC(12, 2) NOT NULL CHECK (valor > 0),
+    categoria VARCHAR(80) NOT NULL,
+    data_programada DATE NOT NULL,
+    forma_pagamento VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito')),
+    cartao_id INTEGER REFERENCES cartoes(id) ON DELETE SET NULL,
+    movimentacao_id INTEGER UNIQUE REFERENCES movimentacoes(id) ON DELETE SET NULL,
+    lancada_em TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
     ON movimentacoes(usuario_id, data DESC);
 CREATE INDEX IF NOT EXISTS idx_listas_usuario
@@ -201,5 +216,8 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_fatura_pagamento ON movimentacoes(f
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_grupo_parcelamento ON movimentacoes(grupo_parcelamento)
     WHERE grupo_parcelamento IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao_id, data DESC);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_programadas_pendentes
+    ON movimentacoes_programadas(usuario_id, data_programada)
+    WHERE lancada_em IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

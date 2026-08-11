@@ -147,6 +147,31 @@ router.post("/gerar", async (req, res, next) => {
             );
             geradas += inserida.rowCount;
         }
+        const pendentes = await client.query(
+            `SELECT * FROM movimentacoes_programadas
+             WHERE usuario_id = $1 AND lancada_em IS NULL AND data_programada <= CURRENT_DATE
+             ORDER BY data_programada, id FOR UPDATE`,
+            [req.usuarioId]
+        );
+        for (const programada of pendentes.rows) {
+            if (programada.tipo === "despesa" && programada.forma_pagamento === "credito") {
+                const cartao = await buscarCartaoComUso(client, req.usuarioId, programada.cartao_id, { bloquear: true });
+                if (!cartao || !possuiLimite(cartao, Number(programada.valor))) {
+                    ignoradasPorCredito += 1;
+                    continue;
+                }
+            }
+            const inserida = await client.query(
+                `INSERT INTO movimentacoes (usuario_id, tipo, descricao, valor, categoria, data, forma_pagamento, cartao_id)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+                [req.usuarioId, programada.tipo, programada.descricao, programada.valor, programada.categoria, programada.data_programada, programada.forma_pagamento, programada.cartao_id]
+            );
+            await client.query(
+                "UPDATE movimentacoes_programadas SET movimentacao_id = $1, lancada_em = NOW() WHERE id = $2",
+                [inserida.rows[0].id, programada.id]
+            );
+            geradas += 1;
+        }
         await client.query("COMMIT");
         const movimentacoes = await pool.query(
             `SELECT m.*, l.quantidade AS quantidade, c.nome AS cartao_nome

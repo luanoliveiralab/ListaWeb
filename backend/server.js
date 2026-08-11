@@ -1782,6 +1782,44 @@ app.post(
 // ATUALIZAR MOVIMENTAÇÃO
 // =====================================================
 
+app.post("/financas/programar", autenticar, async (req, res) => {
+    const { tipo, descricao, valor, categoria, data, forma_pagamento, cartao_id } = req.body;
+    if (
+        !["receita", "despesa"].includes(tipo) ||
+        typeof descricao !== "string" || !descricao.trim() || descricao.trim().length > 255 ||
+        typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80 ||
+        typeof valor !== "number" || !Number.isFinite(valor) || valor <= 0 || valor > VALOR_MONETARIO_MAXIMO ||
+        !dataIsoValida(data) || data < new Date().toISOString().slice(0, 10) ||
+        (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento))
+    ) {
+        return res.status(400).json({ mensagem: "Dados da movimentação programada inválidos." });
+    }
+
+    const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
+    const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+    if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) {
+        return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
+    }
+
+    try {
+        if (cartaoId) {
+            const cartao = await pool.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+            if (!cartao.rowCount) return res.status(400).json({ mensagem: "Cartão inválido." });
+        }
+        const result = await pool.query(
+            `INSERT INTO movimentacoes_programadas
+                (usuario_id, tipo, descricao, valor, categoria, data_programada, forma_pagamento, cartao_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             RETURNING *`,
+            [req.usuarioId, tipo, descricao.trim(), valor, categoria.trim(), data, formaPagamento, cartaoId]
+        );
+        return res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error("Erro ao programar movimentação:", err);
+        return res.status(500).json({ mensagem: "Erro ao programar movimentação." });
+    }
+});
+
 app.put(
     "/financas/:id",
     autenticar,

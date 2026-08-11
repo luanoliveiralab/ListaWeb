@@ -31,6 +31,10 @@ export const financasService = {
         return api.post("/financas", dados);
     },
 
+    programar(dados: MovimentacaoDTO) {
+        return api.post("/financas/programar", dados);
+    },
+
     atualizar(
         id: number,
         dados: AtualizarMovimentacaoDTO

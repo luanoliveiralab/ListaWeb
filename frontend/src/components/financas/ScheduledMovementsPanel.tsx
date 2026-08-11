@@ -54,7 +54,7 @@ export default function ScheduledMovementsPanel({ usuarioId, cartoes, onPrograma
 
     setSalvando(true);
     try {
-      await financasService.adicionar({
+      await financasService.programar({
         usuario_id: usuarioId,
         tipo: formulario.tipo,
         descricao: formulario.descricao.trim(),
@@ -95,7 +95,7 @@ export default function ScheduledMovementsPanel({ usuarioId, cartoes, onPrograma
           {formulario.tipo === "despesa" && <div><label className="field-label" htmlFor="programacao-pagamento">Como será pago</label><AppSelect id="programacao-pagamento" className="mt-2" value={formulario.forma_pagamento} onValueChange={(value) => setFormulario({ ...formulario, forma_pagamento: value as "saldo" | "credito", cartao_id: value === "saldo" ? "" : formulario.cartao_id })} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} /></div>}
           {formulario.tipo === "despesa" && formulario.forma_pagamento === "credito" && <div><label className="field-label" htmlFor="programacao-cartao">Cartão</label><AppSelect id="programacao-cartao" className="mt-2" value={formulario.cartao_id} onValueChange={(cartao_id) => setFormulario({ ...formulario, cartao_id })} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} /></div>}
         </div>
-        <p className="mt-4 text-xs leading-5 text-muted-foreground">A movimentação aparecerá somente uma vez na data escolhida. No crédito, o cartão precisa ter limite disponível.</p>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">A movimentação será lançada somente uma vez, no dia escolhido. No crédito, o limite será validado nessa data.</p>
         <div className="expandable-form-actions mt-6"><button type="button" onClick={cancelar} disabled={salvando} className="button-secondary">Cancelar</button><button disabled={salvando} className="button-primary"><CalendarClock size={17} /> {salvando ? "Programando..." : "Programar movimentação"}</button></div>
       </form>}
     </section>
