@@ -57,7 +57,7 @@ export default function FinanceTable({
         });
     }, [categoriaSelecionada, filtro, movimentacoes, pesquisa]);
 
-    const resumo = movimentacoesVisiveis.filter((mov) => mov.impacta_resultado !== false).reduce(
+    const resumo = movimentacoesVisiveis.filter((mov) => !mov.pendente && mov.impacta_resultado !== false).reduce(
         (acc, mov) => {
             acc[mov.tipo === "receita" ? "receitas" : "despesas"] += Number(mov.valor);
             return acc;
@@ -65,7 +65,7 @@ export default function FinanceTable({
         { receitas: 0, despesas: 0 }
     );
     const impactoTransferencias = movimentacoesVisiveis
-        .filter((mov) => mov.impacta_resultado === false)
+        .filter((mov) => !mov.pendente && mov.impacta_resultado === false)
         .reduce((total, mov) => total + (mov.tipo === "receita" ? Number(mov.valor) : -Number(mov.valor)), 0);
     const saldoRelatorio = resumo.receitas - resumo.despesas + impactoTransferencias;
     const filtrosAtivos = [
@@ -88,6 +88,9 @@ export default function FinanceTable({
     ).length;
     const quantidadeDespesas = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado !== false && movimentacao.tipo === "despesa").length;
     const quantidadeTransferencias = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado === false).length;
+    const realizadas = movimentacoesVisiveis.filter((movimentacao) => !movimentacao.pendente);
+    const pendentes = movimentacoesVisiveis.filter((movimentacao) => movimentacao.pendente);
+    const movimentacoesAgrupadas = [...realizadas, ...pendentes];
 
     if (loading) {
         return (
@@ -179,11 +182,14 @@ export default function FinanceTable({
                 </div>
             ) : (
                 <div className="divide-y divide-border">
-                    {movimentacoesVisiveis.map((movimentacao, index) => {
+                    {movimentacoesAgrupadas.map((movimentacao, index) => {
                         const receita = movimentacao.tipo === "receita";
                         const transferencia = movimentacao.impacta_resultado === false;
 
                         return (
+                            <div key={movimentacao.id}>
+                            {index === 0 && !movimentacao.pendente && <div className="bg-muted/40 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:px-6">Realizadas</div>}
+                            {movimentacao.pendente && index === realizadas.length && <div className="flex items-center justify-between bg-amber-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 sm:px-6"><span>Pendentes / futuras</span><span className="normal-case tracking-normal">Ainda não afetam o saldo</span></div>}
                             <article
                                 key={movimentacao.id}
                                 className="transaction-row group"
@@ -218,6 +224,7 @@ export default function FinanceTable({
                                                     {movimentacao.categoria}
                                                 </span>
                                                 {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
+                                                {movimentacao.pendente && <span className="rounded-full bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-300">Programada</span>}
                                                 {movimentacao.tipo === "despesa" && (
                                                     <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                         {movimentacao.forma_pagamento === "credito"
@@ -242,24 +249,25 @@ export default function FinanceTable({
                                 </div>
 
                                 {!transferencia && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                                    <button
+                                    {!movimentacao.pendente && <button
                                         type="button"
                                         onClick={() => onEditar(movimentacao)}
                                         className="icon-button"
                                         aria-label={`Editar ${movimentacao.descricao}`}
                                     >
                                         <Pencil size={17} />
-                                    </button>
+                                    </button>}
                                     <button
                                         type="button"
                                         onClick={() => onExcluir(movimentacao.id)}
                                         className="icon-button hover:text-destructive"
-                                        aria-label={`Excluir ${movimentacao.descricao}`}
+                                        aria-label={`${movimentacao.pendente ? "Cancelar programação de" : "Excluir"} ${movimentacao.descricao}`}
                                     >
                                         <Trash2 size={17} />
                                     </button>
                                 </div>}
                             </article>
+                            </div>
                         );
                     })}
                 </div>

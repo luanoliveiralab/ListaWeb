@@ -33,6 +33,20 @@ import type { Orcamento } from "@/types/Orcamento";
 import { orcamentosService } from "@/services/orcamentos.service";
 import { useBudgetThresholdAlerts } from "@/hooks/useBudgetThresholdAlerts";
 
+interface MovimentacaoProgramada {
+    id: number;
+    usuario_id: number;
+    tipo: "receita" | "despesa";
+    descricao: string;
+    valor: number;
+    categoria: string;
+    data_programada: string;
+    forma_pagamento: "saldo" | "credito";
+    cartao_id?: number | null;
+    cartao_nome?: string | null;
+    created_at: string;
+}
+
 export default function FinancasPage() {
     const { usuario } = useUsuario();
     const { mostrarAviso } = useToast();
@@ -69,6 +83,7 @@ export default function FinancasPage() {
 
     const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
     const cartoesKey = ["cartoes", usuario?.id] as const;
+    const programadasKey = ["movimentacoes-programadas", usuario?.id] as const;
     const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
     const movimentacoesQuery = useQuery<Movimentacao[]>({
         queryKey: movimentacoesKey,
@@ -80,6 +95,11 @@ export default function FinancasPage() {
         queryFn: cartoesService.listar,
         enabled: Boolean(usuario?.id),
     });
+    const programadasQuery = useQuery<MovimentacaoProgramada[]>({
+        queryKey: programadasKey,
+        queryFn: async () => (await financasService.buscarProgramadas()) as MovimentacaoProgramada[],
+        enabled: Boolean(usuario?.id),
+    });
     const orcamentosQuery = useQuery<Orcamento[]>({
         queryKey: orcamentosKey,
         queryFn: () => orcamentosService.buscar(usuario!.id, mes, ano),
@@ -87,6 +107,7 @@ export default function FinancasPage() {
     });
     const movimentacoes = movimentacoesQuery.data ?? [];
     const cartoes = cartoesQuery.data ?? [];
+    const programadas = programadasQuery.data ?? [];
     const orcamentos = orcamentosQuery.data ?? [];
     const loading = movimentacoesQuery.isPending;
     const carregandoCartoes = cartoesQuery.isPending;
@@ -236,7 +257,16 @@ export default function FinancasPage() {
     async function confirmarExclusaoMovimentacao() {
         if (!movimentacaoExcluir) return;
         setExcluindoMovimentacao(true);
-        try { await excluirMovimentacao(movimentacaoExcluir.id); setMovimentacaoExcluir(null); }
+        try {
+            if (movimentacaoExcluir.pendente && movimentacaoExcluir.programada_id) {
+                await financasService.cancelarProgramacao(movimentacaoExcluir.programada_id);
+                queryClient.invalidateQueries({ queryKey: programadasKey });
+                mostrarAviso("Movimentação programada cancelada.");
+            } else {
+                await excluirMovimentacao(movimentacaoExcluir.id);
+            }
+            setMovimentacaoExcluir(null);
+        }
         finally { setExcluindoMovimentacao(false); }
     }
 
@@ -312,6 +342,27 @@ export default function FinancasPage() {
             anoMov === ano
         );
     });
+    const movimentacoesPendentes = programadas
+        .filter((mov) => {
+            const [anoMov, mesMov] = mov.data_programada.slice(0, 10).split("-").map(Number);
+            return mesMov === mes && anoMov === ano;
+        })
+        .map<Movimentacao>((mov) => ({
+            id: -mov.id,
+            usuario_id: mov.usuario_id,
+            tipo: mov.tipo,
+            descricao: mov.descricao,
+            valor: Number(mov.valor),
+            categoria: mov.categoria,
+            data: mov.data_programada,
+            created_at: mov.created_at,
+            forma_pagamento: mov.forma_pagamento,
+            cartao_id: mov.cartao_id,
+            cartao_nome: mov.cartao_nome,
+            pendente: true,
+            programada_id: mov.id,
+        }));
+    const movimentacoesDaLista = [...movimentacoesFiltradas, ...movimentacoesPendentes];
 
     const movimentacoesAnaliticas = movimentacoesFiltradas.filter((mov) => !mov.fatura_pagamento_id && mov.impacta_resultado !== false);
     const receitas = movimentacoesAnaliticas
@@ -420,18 +471,19 @@ export default function FinancasPage() {
                 cartoes={cartoes}
                 onProgramada={() => {
                     queryClient.invalidateQueries({ queryKey: movimentacoesKey });
+                    queryClient.invalidateQueries({ queryKey: programadasKey });
                     atualizarDashboard();
                 }}
             />
 
             <FinanceTable
-                movimentacoes={movimentacoesFiltradas}
+                movimentacoes={movimentacoesDaLista}
                 loading={loading}
                 categoriaSelecionada={categoriaSelecionada}
                 onCategoriaChange={setCategoriaSelecionada}
                 onEditar={editarMovimentacao}
                 onExcluir={(id) => {
-                    const movimentacao = movimentacoes.find(
+                    const movimentacao = movimentacoesDaLista.find(
                         (mov) => mov.id === id
                     );
 
@@ -441,7 +493,7 @@ export default function FinancasPage() {
                 }}
             />
 
-            <ConfirmationDialog aberto={Boolean(movimentacaoExcluir)} titulo="Excluir esta movimentação?" descricao={<>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> será removida e deixará de participar do saldo e dos relatórios.</>} confirmar="Sim, excluir movimentação" processando={excluindoMovimentacao} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoMovimentacao} onAlterar={(aberto) => { if (!aberto) setMovimentacaoExcluir(null); }} />
+            <ConfirmationDialog aberto={Boolean(movimentacaoExcluir)} titulo={movimentacaoExcluir?.pendente ? "Cancelar movimentação programada?" : "Excluir esta movimentação?"} descricao={movimentacaoExcluir?.pendente ? <>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> não será lançada.</> : <>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> será removida e deixará de participar do saldo e dos relatórios.</>} confirmar={movimentacaoExcluir?.pendente ? "Sim, cancelar programação" : "Sim, excluir movimentação"} processando={excluindoMovimentacao} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoMovimentacao} onAlterar={(aberto) => { if (!aberto) setMovimentacaoExcluir(null); }} />
 
             <EditMovimentacaoModal
                 key={movimentacaoEditando?.id ?? "fechado"}

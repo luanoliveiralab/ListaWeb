@@ -27,12 +27,20 @@ export const financasService = {
         return api.get(`/financas/${usuarioId}`);
     },
 
+    buscarProgramadas() {
+        return api.get("/financas/programadas");
+    },
+
     adicionar(dados: MovimentacaoDTO): Promise<import("@/types/Movimentacao").Movimentacao | { movimentacoes: import("@/types/Movimentacao").Movimentacao[] }> {
         return api.post("/financas", dados);
     },
 
     programar(dados: MovimentacaoDTO) {
         return api.post("/financas/programar", dados);
+    },
+
+    cancelarProgramacao(id: number) {
+        return api.delete(`/financas/programar/${id}`);
     },
 
     atualizar(

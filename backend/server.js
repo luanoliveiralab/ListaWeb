@@ -1556,6 +1556,23 @@ app.get("/dashboard", autenticar, async (req, res) => {
 // LISTAR MOVIMENTAÇÕES
 // =====================================================
 
+app.get("/financas/programadas", autenticar, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT p.*, c.nome AS cartao_nome
+             FROM movimentacoes_programadas p
+             LEFT JOIN cartoes c ON c.id = p.cartao_id
+             WHERE p.usuario_id = $1 AND p.lancada_em IS NULL
+             ORDER BY p.data_programada ASC, p.id ASC`,
+            [req.usuarioId]
+        );
+        return res.json(result.rows);
+    } catch (err) {
+        console.error("Erro ao buscar movimentações programadas:", err);
+        return res.status(500).json({ mensagem: "Erro ao buscar movimentações programadas." });
+    }
+});
+
 app.get(
     "/financas/:usuarioId",
     autenticar,
@@ -1817,6 +1834,22 @@ app.post("/financas/programar", autenticar, async (req, res) => {
     } catch (err) {
         console.error("Erro ao programar movimentação:", err);
         return res.status(500).json({ mensagem: "Erro ao programar movimentação." });
+    }
+});
+
+app.delete("/financas/programar/:id", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ mensagem: "Programação inválida." });
+    try {
+        const result = await pool.query(
+            "DELETE FROM movimentacoes_programadas WHERE id = $1 AND usuario_id = $2 AND lancada_em IS NULL RETURNING id",
+            [id, req.usuarioId]
+        );
+        if (!result.rowCount) return res.status(404).json({ mensagem: "Programação não encontrada." });
+        return res.json({ mensagem: "Movimentação programada cancelada." });
+    } catch (err) {
+        console.error("Erro ao cancelar movimentação programada:", err);
+        return res.status(500).json({ mensagem: "Erro ao cancelar movimentação programada." });
     }
 });
 
