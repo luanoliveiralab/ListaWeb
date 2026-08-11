@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/AppLayout";
 import FinanceCards from "@/components/financas/FinanceCards";
 import AddMovimentacaoForm from "@/components/financas/AddMovimentacaoForm";
+import ScheduledMovementsPanel from "@/components/financas/ScheduledMovementsPanel";
 import FinanceTable from "@/components/financas/FinanceTable";
 
 import { useUsuario } from "@/hooks/useUsuario";
@@ -412,6 +413,15 @@ export default function FinancasPage() {
                 setParcelas={setParcelas}
                 cartoes={cartoes}
                 adicionarMovimentacao={adicionarMovimentacao}
+            />
+
+            <ScheduledMovementsPanel
+                cartoes={cartoes}
+                onCriada={() => {
+                    queryClient.invalidateQueries({ queryKey: ["recorrencias", usuario?.id] });
+                    queryClient.invalidateQueries({ queryKey: movimentacoesKey });
+                    atualizarDashboard();
+                }}
             />
 
             <FinanceTable

@@ -6,6 +6,8 @@ export interface Recorrencia {
   categoria: string;
   dia: number;
   ativa: boolean;
+  forma_pagamento: "saldo" | "credito";
+  cartao_id: number | null;
 }
 
 export interface Meta {

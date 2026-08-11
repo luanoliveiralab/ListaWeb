@@ -349,6 +349,28 @@ test("mantém o modal de categorias organizado no desktop e no mobile", async ({
   }
 });
 
+test("programa uma despesa mensal no crédito pela página de finanças", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/financas");
+
+  await page.getByRole("button", { name: "Programar mensalmente" }).click();
+  await page.getByPlaceholder("Ex.: Aluguel").fill("Assinatura mensal");
+  await page.getByPlaceholder("R$ 0,00").last().fill("45,90");
+  await page.getByLabel("Categoria").click();
+  await page.getByRole("option", { name: "Mercado" }).click();
+  await page.getByLabel("Como será pago").click();
+  await page.getByRole("option", { name: "Cartão de crédito" }).click();
+  await page.getByLabel("Cartão").click();
+  await page.getByRole("option", { name: /Principal.*Nubank/ }).click();
+  await page.getByRole("button", { name: "Programar movimentação" }).click();
+
+  await expect(page.getByText("Movimentação mensal programada.")).toBeVisible();
+});
+
 test("exibe em cada página somente as categorias configuradas", async ({ page }) => {
   await prepararApi(page);
   await page.route("http://localhost:3001/categorias", (route) => responderJson(route, [

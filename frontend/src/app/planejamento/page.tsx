@@ -13,6 +13,8 @@ import type { Movimentacao } from "@/types/Movimentacao";
 import BudgetPanel from "@/components/financas/BudgetPanel";
 import PeriodSelector from "@/components/shared/PeriodSelector";
 import { orcamentosService } from "@/services/orcamentos.service";
+import { cartoesService } from "@/services/cartoes.service";
+import type { Cartao } from "@/types/Cartao";
 import { usePeriod } from "@/context/PeriodContext";
 import { useCategorias } from "@/hooks/useCategorias";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
@@ -27,7 +29,7 @@ export default function PlanejamentoPage() {
   const { mostrarAviso } = useToast();
   const { mes, ano, setMes, setAno } = usePeriod();
   const queryClient = useQueryClient();
-  const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
+  const [rec, setRec] = useState({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" });
   const { categorias } = useCategorias(rec.tipo as "receita" | "despesa", "planejamento");
   const [meta, setMeta] = useState({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
@@ -41,14 +43,17 @@ export default function PlanejamentoPage() {
   const metasKey = ["metas", usuario?.id] as const;
   const orcamentosKey = ["orcamentos", usuario?.id, ano, mes] as const;
   const movimentacoesKey = ["financas", usuario?.id, ano, mes] as const;
+  const cartoesKey = ["cartoes", usuario?.id] as const;
   const recorrenciasQuery = useQuery<Recorrencia[]>({ queryKey: recorrenciasKey, queryFn: planejamentoService.buscarRecorrencias, enabled: Boolean(usuario?.id) });
   const metasQuery = useQuery<Meta[]>({ queryKey: metasKey, queryFn: planejamentoService.buscarMetas, enabled: Boolean(usuario?.id) });
   const orcamentosQuery = useQuery<Orcamento[]>({ queryKey: orcamentosKey, queryFn: () => orcamentosService.buscar(usuario!.id, mes, ano), enabled: Boolean(usuario?.id) });
   const movimentacoesQuery = useQuery<Movimentacao[]>({ queryKey: movimentacoesKey, queryFn: async () => (await planejamentoService.gerarRecorrencias(mes, ano)).movimentacoes, enabled: Boolean(usuario?.id) });
+  const cartoesQuery = useQuery<Cartao[]>({ queryKey: cartoesKey, queryFn: cartoesService.listar, enabled: Boolean(usuario?.id) });
   const recorrencias = recorrenciasQuery.data ?? [];
   const metas = metasQuery.data ?? [];
   const orcamentos = orcamentosQuery.data ?? [];
   const movimentacoes = movimentacoesQuery.data ?? [];
+  const cartoes = cartoesQuery.data ?? [];
   const erroCarregamento = recorrenciasQuery.error || metasQuery.error || orcamentosQuery.error || movimentacoesQuery.error;
 
   useBudgetThresholdAlerts({
@@ -121,7 +126,7 @@ export default function PlanejamentoPage() {
       const nova = await planejamentoService.criarRecorrencia({ ...rec, valor: Number(rec.valor.replace(",", ".")), dia: Number(rec.dia) });
       atualizarRecorrencias((itens) => [nova, ...itens]);
       sincronizarFinancas();
-      setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" });
+      setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" });
       setRecorrenciaAberta(false);
       mostrarAviso("Recorrência criada.");
     } catch (error) {
@@ -198,12 +203,14 @@ export default function PlanejamentoPage() {
             {!recorrenciaAberta && <button type="button" onClick={() => setRecorrenciaAberta(true)} className="button-primary shrink-0"><Plus size={17} /> Criar recorrência</button>}
           </div>
           {recorrenciaAberta && <form onSubmit={criarRecorrencia} className="form-grid animate-in border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300">
-            <div className="field-group"><label className="field-label" htmlFor="tipo-recorrencia">Tipo</label><AppSelect id="tipo-recorrencia" value={rec.tipo} onValueChange={(value) => setRec({ ...rec, tipo: value })} options={[{ value: "despesa", label: "Despesa" }, { value: "receita", label: "Receita" }]} /></div>
+            <div className="field-group"><label className="field-label" htmlFor="tipo-recorrencia">Tipo</label><AppSelect id="tipo-recorrencia" value={rec.tipo} onValueChange={(value) => setRec({ ...rec, tipo: value, categoria: "", forma_pagamento: value === "receita" ? "saldo" : rec.forma_pagamento, cartao_id: value === "receita" ? "" : rec.cartao_id })} options={[{ value: "despesa", label: "Despesa" }, { value: "receita", label: "Receita" }]} /></div>
             <div className="field-group"><label className="field-label" htmlFor="descricao-recorrencia">Descrição</label><input id="descricao-recorrencia" className="control" placeholder="Ex.: Aluguel" value={rec.descricao} onChange={(e) => setRec({ ...rec, descricao: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="valor-recorrencia">Valor (R$)</label><input id="valor-recorrencia" className="control" placeholder="R$ 0,00" inputMode="decimal" value={rec.valor} onChange={(e) => setRec({ ...rec, valor: e.target.value })} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="categoria-recorrencia">Categoria</label><AppSelect id="categoria-recorrencia" value={rec.categoria} onValueChange={(value) => setRec({ ...rec, categoria: value })} placeholder="Selecionar categoria" options={categorias.map((categoria) => ({ value: categoria.nome, label: categoria.nome }))} required /></div>
             <div className="field-group"><label className="field-label" htmlFor="dia-recorrencia">Dia do lançamento</label><input id="dia-recorrencia" className="control" type="number" min="1" max="28" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></div>
-            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5" }); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Adicionar recorrência</button></div>
+            {rec.tipo === "despesa" && <div className="field-group"><label className="field-label" htmlFor="pagamento-recorrencia">Como será pago</label><AppSelect id="pagamento-recorrencia" value={rec.forma_pagamento} onValueChange={(value) => setRec({ ...rec, forma_pagamento: value, cartao_id: value === "saldo" ? "" : rec.cartao_id })} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} /></div>}
+            {rec.tipo === "despesa" && rec.forma_pagamento === "credito" && <div className="field-group"><label className="field-label" htmlFor="cartao-recorrencia">Cartão</label><AppSelect id="cartao-recorrencia" value={rec.cartao_id} onValueChange={(value) => setRec({ ...rec, cartao_id: value })} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} /></div>}
+            <div className="expandable-form-actions md:col-span-2"><button type="button" onClick={() => { setRec({ tipo: "despesa", descricao: "", valor: "", categoria: "", dia: "5", forma_pagamento: "saldo", cartao_id: "" }); setRecorrenciaAberta(false); }} className="button-secondary">Cancelar</button><button className="button-primary"><Plus size={17} /> Adicionar recorrência</button></div>
           </form>}
 
           <div className="planning-list">
@@ -211,7 +218,7 @@ export default function PlanejamentoPage() {
               const TipoIcon = item.tipo === "receita" ? TrendingUp : TrendingDown;
               return <article key={item.id} className={`planning-row ${!item.ativa ? "planning-row-muted" : ""}`}>
                 <span className={`planning-kind ${item.tipo}`}><TipoIcon size={18} /></span>
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{item.descricao}</strong><span className={`status-pill ${item.ativa ? "active" : "paused"}`}>{item.ativa ? "Ativa" : "Pausada"}</span></div><p className="planning-detail">{item.categoria} <span>•</span> todo dia {item.dia}</p></div>
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{item.descricao}</strong><span className={`status-pill ${item.ativa ? "active" : "paused"}`}>{item.ativa ? "Ativa" : "Pausada"}</span></div><p className="planning-detail">{item.categoria} <span>•</span> todo dia {item.dia}{item.tipo === "despesa" && <><span>•</span> {item.forma_pagamento === "credito" ? "cartão de crédito" : "saldo"}</>}</p></div>
                 <strong className={item.tipo === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{item.tipo === "receita" ? "+" : "−"}{moeda.format(Number(item.valor))}</strong>
                 <div className="flex gap-1"><button type="button" className="icon-button" aria-label={item.ativa ? "Pausar recorrência" : "Ativar recorrência"} onClick={async () => { const atualizado = await planejamentoService.alternarRecorrencia(item.id, !item.ativa); atualizarRecorrencias((lista) => lista.map((r) => r.id === item.id ? atualizado : r)); sincronizarFinancas(); }}>{item.ativa ? <Pause size={17} /> : <Play size={17} />}</button><button type="button" className="icon-button text-destructive" aria-label={`Excluir recorrência ${item.descricao}`} onClick={() => setExclusao({ tipo: "recorrencia", item })}><Trash2 size={17} /></button></div>
               </article>;

@@ -2,6 +2,7 @@ const express = require("express");
 const { pool } = require("../db");
 const { autenticar } = require("../middleware/autenticar");
 const { idPositivo, periodoValido } = require("../http");
+const { buscarCartaoComUso, possuiLimite } = require("../credit");
 
 const router = express.Router();
 router.use(autenticar);
@@ -23,7 +24,7 @@ router.get("/", async (req, res, next) => {
 });
 
 router.post("/", async (req, res, next) => {
-    const { tipo, descricao, valor, categoria, dia, inicio, fim } = req.body;
+    const { tipo, descricao, valor, categoria, dia, inicio, fim, forma_pagamento, cartao_id } = req.body;
     const valorNumero = Number(valor);
     const inicioNormalizado = dataIsoValida(inicio);
     const fimNormalizado = dataIsoValida(fim);
@@ -38,11 +39,23 @@ router.post("/", async (req, res, next) => {
     ) {
         return res.status(400).json({ mensagem: "Dados da recorrência inválidos." });
     }
+    if (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento)) {
+        return res.status(400).json({ mensagem: "Forma de pagamento inválida." });
+    }
+    const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
+    const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+    if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) {
+        return res.status(400).json({ mensagem: "Selecione um cartão para a despesa recorrente." });
+    }
     try {
+        if (cartaoId) {
+            const cartao = await pool.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2", [cartaoId, req.usuarioId]);
+            if (!cartao.rowCount) return res.status(400).json({ mensagem: "Cartão inválido." });
+        }
         const result = await pool.query(
-            `INSERT INTO recorrencias (usuario_id, tipo, descricao, valor, categoria, dia, inicio, fim)
-             VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,CURRENT_DATE),$8) RETURNING *`,
-            [req.usuarioId, tipo, descricao.trim(), valorNumero, categoria.trim(), Number(dia), inicioNormalizado, fimNormalizado]
+            `INSERT INTO recorrencias (usuario_id, tipo, descricao, valor, categoria, dia, inicio, fim, forma_pagamento, cartao_id)
+             VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,CURRENT_DATE),$8,$9,$10) RETURNING *`,
+            [req.usuarioId, tipo, descricao.trim(), valorNumero, categoria.trim(), Number(dia), inicioNormalizado, fimNormalizado, formaPagamento, cartaoId]
         );
         return res.status(201).json(result.rows[0]);
     } catch (error) { return next(error); }
@@ -78,17 +91,37 @@ router.post("/gerar", async (req, res, next) => {
     try {
         ({ mes, ano } = periodoValido(req.body.mes ?? hoje.getMonth() + 1, req.body.ano ?? hoje.getFullYear()));
     } catch (error) { return next(error); }
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            `INSERT INTO movimentacoes (usuario_id, tipo, descricao, valor, categoria, data, recorrencia_id)
-             SELECT usuario_id, tipo, descricao, valor, categoria, make_date($2, $3, dia), id
+        await client.query("BEGIN");
+        const programadas = await client.query(
+            `SELECT *, make_date($2, $3, dia) AS data_programada
              FROM recorrencias WHERE usuario_id = $1 AND ativa = TRUE
                AND make_date($2, $3, dia) >= inicio
                AND (fim IS NULL OR make_date($2, $3, dia) <= fim)
-             ON CONFLICT (recorrencia_id, data) WHERE recorrencia_id IS NOT NULL DO NOTHING
-             RETURNING *`,
+             ORDER BY dia, id FOR UPDATE`,
             [req.usuarioId, ano, mes]
         );
+        let geradas = 0;
+        let ignoradasPorCredito = 0;
+        for (const recorrencia of programadas.rows) {
+            if (recorrencia.tipo === "despesa" && recorrencia.forma_pagamento === "credito") {
+                const cartao = await buscarCartaoComUso(client, req.usuarioId, recorrencia.cartao_id, { bloquear: true });
+                if (!cartao || !possuiLimite(cartao, Number(recorrencia.valor))) {
+                    ignoradasPorCredito += 1;
+                    continue;
+                }
+            }
+            const inserida = await client.query(
+                `INSERT INTO movimentacoes (usuario_id, tipo, descricao, valor, categoria, data, recorrencia_id, forma_pagamento, cartao_id)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                 ON CONFLICT (recorrencia_id, data) WHERE recorrencia_id IS NOT NULL DO NOTHING
+                 RETURNING id`,
+                [req.usuarioId, recorrencia.tipo, recorrencia.descricao, recorrencia.valor, recorrencia.categoria, recorrencia.data_programada, recorrencia.id, recorrencia.forma_pagamento, recorrencia.cartao_id]
+            );
+            geradas += inserida.rowCount;
+        }
+        await client.query("COMMIT");
         const movimentacoes = await pool.query(
             `SELECT m.*, l.quantidade AS quantidade, c.nome AS cartao_nome
              FROM movimentacoes m
@@ -100,8 +133,9 @@ router.post("/gerar", async (req, res, next) => {
              ORDER BY m.data DESC, m.id DESC`,
             [req.usuarioId, ano, mes]
         );
-        return res.json({ geradas: result.rowCount, movimentacoes: movimentacoes.rows });
-    } catch (error) { return next(error); }
+        return res.json({ geradas, ignoradas_por_credito: ignoradasPorCredito, movimentacoes: movimentacoes.rows });
+    } catch (error) { await client.query("ROLLBACK").catch(() => undefined); return next(error); }
+    finally { client.release(); }
 });
 
 module.exports = router;

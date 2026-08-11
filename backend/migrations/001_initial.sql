@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS recorrencias (
     valor NUMERIC(12, 2) NOT NULL CHECK (valor > 0),
     categoria VARCHAR(80) NOT NULL,
     dia SMALLINT NOT NULL CHECK (dia BETWEEN 1 AND 28),
+    forma_pagamento VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito')),
     ativa BOOLEAN NOT NULL DEFAULT TRUE,
     inicio DATE NOT NULL DEFAULT CURRENT_DATE,
     fim DATE,
@@ -173,6 +174,11 @@ ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS parcelas_total SMALLINT CHECK
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS forma_pagamento
     VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS cartao_id
+    INTEGER REFERENCES cartoes(id) ON DELETE SET NULL;
+
+ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS forma_pagamento
+    VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
+ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS cartao_id
     INTEGER REFERENCES cartoes(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
