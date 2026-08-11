@@ -277,7 +277,7 @@ test("integra depósitos de metas ao saldo sem distorcer receitas e despesas", a
   await expect(page.locator("article").filter({ hasText: /^Despesas/ })).toContainText("R$ 250,00");
 });
 
-test("mantém header e formulário fixos enquanto apenas categorias rolam", async ({ page }) => {
+test("mantém o modal de categorias organizado no desktop e no mobile", async ({ page }, testInfo) => {
   await prepararApi(page);
   await page.goto("/");
   await page.getByPlaceholder("E-mail").fill(usuario.email);
@@ -294,17 +294,36 @@ test("mantém header e formulário fixos enquanto apenas categorias rolam", asyn
   const lista = page.getByTestId("categorias-lista");
   await expect(modal).toHaveCSS("overflow-y", "hidden");
   await expect(lista).toHaveCSS("overflow-y", "auto");
-  await page.getByRole("button", { name: "Editar Mercado" }).click();
-  await expect(page.getByText("Despesas e compras")).toBeVisible();
-  await expect(page.getByText("Editando categoria")).toBeVisible();
-  await expect(page.getByLabel("Lista de Compras")).toBeChecked();
-  await expect(page.getByLabel("Finanças")).toBeChecked();
-  await expect(page.getByLabel("Planejamento")).toBeChecked();
   await page.getByRole("button", { name: "Excluir Mercado" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sim, excluir categoria" })).toBeVisible();
   await page.getByRole("button", { name: "Cancelar" }).click();
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Editar Mercado" }).click();
+  await expect(page.getByText("Editando categoria")).toBeVisible();
+  await expect(page.getByLabel("Lista de Compras")).toBeChecked();
+  await expect(page.getByLabel("Finanças")).toBeChecked();
+  await expect(page.getByLabel("Planejamento")).toBeChecked();
+
+  if (testInfo.project.name === "mobile") {
+    await expect(lista).not.toBeVisible();
+    await expect(page.getByRole("tab", { name: "Editar" })).toHaveAttribute("aria-selected", "true");
+    const caixa = await modal.boundingBox();
+    expect(caixa).not.toBeNull();
+    expect(caixa!.x).toBeGreaterThanOrEqual(0);
+    expect(caixa!.y + caixa!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  } else {
+    await expect(page.getByText("Despesas e compras")).toBeVisible();
+    await expect(lista).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  if (testInfo.project.name === "mobile") {
+    await expect(lista).toBeVisible();
+    await page.getByRole("tab", { name: "Nova categoria" }).click();
+    await expect(page.getByRole("heading", { name: "Nova categoria" })).toBeVisible();
+  }
 });
 
 test("exibe em cada página somente as categorias configuradas", async ({ page }) => {
