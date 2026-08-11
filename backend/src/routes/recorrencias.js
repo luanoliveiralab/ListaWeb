@@ -149,7 +149,7 @@ router.post("/gerar", async (req, res, next) => {
         }
         const pendentes = await client.query(
             `SELECT * FROM movimentacoes_programadas
-             WHERE usuario_id = $1 AND lancada_em IS NULL AND data_programada <= CURRENT_DATE
+             WHERE usuario_id = $1 AND lancada_em IS NULL AND data_programada = CURRENT_DATE
              ORDER BY data_programada, id FOR UPDATE`,
             [req.usuarioId]
         );

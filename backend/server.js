@@ -1562,7 +1562,7 @@ app.get("/financas/programadas", autenticar, async (req, res) => {
             `SELECT p.*, c.nome AS cartao_nome
              FROM movimentacoes_programadas p
              LEFT JOIN cartoes c ON c.id = p.cartao_id
-             WHERE p.usuario_id = $1 AND p.lancada_em IS NULL
+             WHERE p.usuario_id = $1 AND p.lancada_em IS NULL AND p.data_programada >= CURRENT_DATE
              ORDER BY p.data_programada ASC, p.id ASC`,
             [req.usuarioId]
         );

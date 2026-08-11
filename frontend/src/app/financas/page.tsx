@@ -353,7 +353,7 @@ export default function FinancasPage() {
     const movimentacoesPendentes = programadas
         .filter((mov) => {
             const [anoMov, mesMov] = mov.data_programada.slice(0, 10).split("-").map(Number);
-            return mesMov === mes && anoMov === ano;
+            return mesMov === mes && anoMov === ano && mov.data_programada >= new Date().toISOString().slice(0, 10);
         })
         .map<Movimentacao>((mov) => ({
             id: -mov.id,
