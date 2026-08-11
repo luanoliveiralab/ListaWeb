@@ -9,10 +9,13 @@ import { usuarioService } from "@/services/usuario.service";
 import { useToast } from "@/providers/ToastProvider";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
+import { limparSessaoLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function PasswordForm() {
   const { mostrarAviso } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -38,8 +41,8 @@ export default function PasswordForm() {
 
       mostrarAviso("Senha alterada com sucesso!");
       await authService.logout();
-      localStorage.removeItem("usuario");
-      sessionStorage.removeItem("csrfToken");
+      limparSessaoLocal();
+      queryClient.clear();
       router.replace("/");
     } catch (err) {
       const mensagem =

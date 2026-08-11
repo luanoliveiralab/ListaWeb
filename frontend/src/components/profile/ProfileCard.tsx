@@ -10,6 +10,9 @@ import type { Usuario } from "@/types/Usuario";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { limparSessaoLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
+import PasswordInput from "@/components/auth/PasswordInput";
 
 import {
     AlertDialog,
@@ -41,6 +44,7 @@ export default function ProfileCard({
 
     const { mostrarAviso } = useToast();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const [mostrarConfirmacao, setMostrarConfirmacao] =
         useState(false);
@@ -49,6 +53,7 @@ export default function ProfileCard({
         useState(false);
     const [confirmarRemocaoFoto, setConfirmarRemocaoFoto] = useState(false);
     const [removendoFoto, setRemovendoFoto] = useState(false);
+    const [senhaExclusao, setSenhaExclusao] = useState("");
 
     async function selecionarFoto(
         e: React.ChangeEvent<HTMLInputElement>
@@ -130,11 +135,13 @@ export default function ProfileCard({
         setExcluindoConta(true);
 
         try {
-            await api.delete(`/usuarios/${id}`);
+            await api.delete(`/usuarios/${id}`, { senhaAtual: senhaExclusao });
 
-            localStorage.removeItem("usuario");
+            limparSessaoLocal();
+            queryClient.clear();
 
             setMostrarConfirmacao(false);
+            setSenhaExclusao("");
 
             mostrarAviso(
                 "Conta excluída com sucesso!",
@@ -243,6 +250,7 @@ export default function ProfileCard({
                     onOpenChange={(aberto: boolean) => {
                         if (!excluindoConta) {
                             setMostrarConfirmacao(aberto);
+                            if (!aberto) setSenhaExclusao("");
                         }
                     }}
                 >
@@ -258,6 +266,17 @@ export default function ProfileCard({
                                 movimentações serão excluídas
                                 e não poderão ser recuperadas.
                             </AlertDialogDescription>
+                            <div className="mt-3 w-full text-left">
+                                <label htmlFor="senha-excluir-conta" className="field-label">Confirme sua senha atual</label>
+                                <PasswordInput
+                                    id="senha-excluir-conta"
+                                    name="senhaExclusao"
+                                    value={senhaExclusao}
+                                    onChange={(event) => setSenhaExclusao(event.target.value)}
+                                    autoComplete="current-password"
+                                    className="mt-2"
+                                />
+                            </div>
                         </AlertDialogHeader>
 
                         <AlertDialogFooter>
@@ -268,7 +287,7 @@ export default function ProfileCard({
                             </AlertDialogCancel>
 
                             <AlertDialogAction
-                                disabled={excluindoConta}
+                                disabled={excluindoConta || !senhaExclusao}
                                 onClick={(
                                     e: React.MouseEvent<HTMLButtonElement>
                                 ) => {

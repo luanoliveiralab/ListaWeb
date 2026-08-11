@@ -8,7 +8,6 @@ export const planejamentoService = {
   gerarRecorrencias: (mes: number, ano: number) => api.post("/recorrencias/gerar", { mes, ano }),
   buscarMetas: () => api.get("/metas"),
   criarMeta: (dados: unknown) => api.post("/metas", dados),
-  atualizarMeta: (id: number, valor_atual: number) => api.put(`/metas/${id}`, { valor_atual }),
   removerMeta: (id: number) => api.delete(`/metas/${id}`),
   buscarHistoricoMeta: (id: number) => api.get(`/metas/${id}/historico`),
   movimentarMeta: (id: number, dados: unknown) => api.post(`/metas/${id}/movimentar`, dados),

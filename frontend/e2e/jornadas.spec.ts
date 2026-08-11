@@ -76,6 +76,31 @@ test("mostra o aviso retornado quando o login falha", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("renova o token de segurança e repete a alteração uma única vez", async ({ page }) => {
+  await prepararApi(page);
+  let tentativas = 0;
+  const tokens: string[] = [];
+  await page.route("http://localhost:3001/csrf", (route) => responderJson(route, { csrfToken: "csrf-renovado" }));
+  await page.route("http://localhost:3001/usuarios/42", (route) => {
+    tentativas += 1;
+    tokens.push(route.request().headers()["x-csrf-token"] ?? "");
+    if (tentativas === 1) return responderJson(route, { mensagem: "Token de segurança inválido.", codigo: "CSRF_INVALIDO" }, 403);
+    return responderJson(route, { ...usuario, nome: "Luan Atualizado" });
+  });
+
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/perfil");
+  await page.getByLabel("Nome", { exact: true }).fill("Luan Atualizado");
+  await page.getByRole("button", { name: "Salvar Alterações" }).click();
+
+  await expect(page.getByText("Perfil atualizado com sucesso!")).toBeVisible();
+  expect(tentativas).toBe(2);
+  expect(tokens).toEqual(["csrf-teste", "csrf-renovado"]);
+});
+
 test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/");
@@ -303,6 +328,9 @@ test("exibe em cada página somente as categorias configuradas", async ({ page }
 
 test("solicita confirmação visual nas exclusões financeiras e de planejamento", async ({ page }) => {
   await prepararApi(page);
+  await page.route("http://localhost:3001/metas", (route) => responderJson(route, [
+    { id: 1, nome: "Reserva", valor_alvo: 10000, valor_atual: 0, prazo: null, concluida: false },
+  ]));
   await page.goto("/");
   await page.getByPlaceholder("E-mail").fill(usuario.email);
   await page.getByPlaceholder("Senha").fill("senha-segura-123");
@@ -364,4 +392,32 @@ test("confirma remoção da foto e avisa quando os dados pessoais não mudam", a
   await page.getByLabel("E-mail", { exact: true }).fill(usuario.email.toUpperCase());
   await page.getByRole("button", { name: "Salvar Alterações" }).click();
   await expect(page.getByText("Este e-mail já existe no seu perfil.")).toBeVisible();
+});
+
+test("exige a senha atual antes de excluir definitivamente a conta", async ({ page }) => {
+  await prepararApi(page);
+  let exclusao: Record<string, unknown> | null = null;
+  await page.route("http://localhost:3001/usuarios/42", (route) => {
+    if (route.request().method() === "DELETE") {
+      exclusao = route.request().postDataJSON();
+      return responderJson(route, { mensagem: "Conta excluída com sucesso." });
+    }
+    return responderJson(route, usuario);
+  });
+
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/perfil");
+  await page.getByRole("button", { name: "Excluir minha conta" }).click();
+
+  const confirmar = page.getByRole("button", { name: "Sim, excluir conta" });
+  await expect(confirmar).toBeDisabled();
+  await page.getByLabel("Confirme sua senha atual").fill("senha-segura-123");
+  await expect(confirmar).toBeEnabled();
+  await confirmar.click();
+
+  await expect(page).toHaveURL(/\/$/);
+  expect(exclusao).toEqual({ senhaAtual: "senha-segura-123" });
 });

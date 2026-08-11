@@ -108,6 +108,23 @@ ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS impacta_resultado BOOLEAN NOT
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS meta_movimentacao_id
     INTEGER UNIQUE REFERENCES meta_movimentacoes(id) ON DELETE CASCADE;
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'movimentacoes_meta_movimentacao_id_fkey'
+          AND conrelid = 'movimentacoes'::regclass
+          AND confdeltype <> 'n'
+    ) THEN
+        ALTER TABLE movimentacoes DROP CONSTRAINT movimentacoes_meta_movimentacao_id_fkey;
+    END IF;
+    ALTER TABLE movimentacoes
+        ADD CONSTRAINT movimentacoes_meta_movimentacao_id_fkey
+        FOREIGN KEY (meta_movimentacao_id) REFERENCES meta_movimentacoes(id) ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS cartoes (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,

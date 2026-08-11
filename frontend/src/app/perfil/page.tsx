@@ -5,8 +5,12 @@ import ProfileCard from "@/components/profile/ProfileCard";
 import ProfileForm from "@/components/profile/ProfileForm";
 import { useUsuario } from "@/hooks/useUsuario";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { usuarioService } from "@/services/usuario.service";
 import { useToast } from "@/providers/ToastProvider";
+import PasswordInput from "@/components/auth/PasswordInput";
+import { limparSessaoLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,10 +26,13 @@ import {
 export default function PerfilPage() {
   const { usuario, setUsuario } = useUsuario();
   const { mostrarAviso } = useToast();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [confirmarEmail, setConfirmarEmail] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState("");
 
   async function atualizarPerfil() {
     if (!usuario) return;
@@ -35,18 +42,30 @@ export default function PerfilPage() {
 
     setSalvando(true);
     try {
-      const usuarioAtualizado = await usuarioService.atualizar(
+      const resposta = await usuarioService.atualizar(
         usuario.id,
         {
           nome: novoNome,
           email: novoEmail,
+          ...(email.trim() ? { senhaAtual } : {}),
         }
       );
 
-      setUsuario(usuarioAtualizado);
+      if (resposta.email_verification_required) {
+        limparSessaoLocal();
+        queryClient.clear();
+        setConfirmarEmail(false);
+        setSenhaAtual("");
+        mostrarAviso(resposta.mensagem || "Confirme o novo e-mail para entrar novamente.");
+        router.replace("/");
+        return;
+      }
+
+      setUsuario(resposta);
       setNome("");
       setEmail("");
       setConfirmarEmail(false);
+      setSenhaAtual("");
 
       mostrarAviso("Perfil atualizado com sucesso!", "sucesso");
     } catch (error) {
@@ -117,11 +136,22 @@ export default function PerfilPage() {
             <AlertDialogDescription>
               Seu e-mail de acesso será alterado de <strong>{usuario?.email}</strong> para <strong>{email.trim()}</strong>. Use o novo endereço no próximo login.
             </AlertDialogDescription>
+            <div className="mt-3 w-full text-left">
+              <label htmlFor="senha-confirmar-email" className="field-label">Confirme sua senha atual</label>
+              <PasswordInput
+                id="senha-confirmar-email"
+                name="senhaAtual"
+                value={senhaAtual}
+                onChange={(event) => setSenhaAtual(event.target.value)}
+                autoComplete="current-password"
+                className="mt-2"
+              />
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={salvando}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={salvando} onClick={() => setSenhaAtual("")}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={salvando}
+              disabled={salvando || !senhaAtual}
               onClick={(event) => {
                 event.preventDefault();
                 atualizarPerfil();

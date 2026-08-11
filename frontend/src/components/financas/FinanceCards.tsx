@@ -54,7 +54,7 @@ export default function FinanceCards({ saldo, receitas, despesas, anterior }: Pr
                 <card.Icone size={21} />
               </span>
             </div>
-            <div className={`mt-4 flex items-center gap-1.5 text-xs font-medium ${favoravel ? "text-emerald-600" : "text-rose-600"}`}>
+            <div className={`mt-4 flex items-center gap-1.5 text-xs font-medium ${favoravel ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
               <Tendencia size={15} />
               {percentual === null ? "Novo neste mês" : `${Math.abs(percentual).toFixed(1)}% em relação ao mês anterior`}
             </div>

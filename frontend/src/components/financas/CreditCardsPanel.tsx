@@ -11,6 +11,7 @@ import { cartoesService } from "@/services/cartoes.service";
 import { useToast } from "@/providers/ToastProvider";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import AppSelect from "@/components/shared/AppSelect";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 interface Props {
   cartoes: Cartao[];
@@ -62,6 +63,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   const [faturaSelecionada, setFaturaSelecionada] = useState<FaturaCartao | null>(null);
   const [alterandoFatura, setAlterandoFatura] = useState(false);
   const [confirmacao, setConfirmacao] = useState<{ tipo: "cartao"; cartao: Cartao } | { tipo: "fatura"; acao: "fechar" | "pagar" } | null>(null);
+  const faturaDialogRef = useAccessibleDialog(Boolean(cartaoFaturas), () => setCartaoFaturas(null));
   const faturasQuery = useQuery({
     queryKey: ["faturas", cartaoFaturas?.id],
     queryFn: () => cartoesService.listarFaturas(cartaoFaturas!.id),
@@ -198,8 +200,9 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
               .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito" && Number(mov.cartao_id) === cartao.id)
               .reduce((total, mov) => total + Number(mov.valor), 0);
             const limite = Number(cartao.limite_disponivel);
-            const disponivel = Math.max(limite - fatura, 0);
-            const uso = limite > 0 ? Math.min((fatura / limite) * 100, 100) : 0;
+            const utilizado = cartao.limite_utilizado === undefined ? fatura : Number(cartao.limite_utilizado);
+            const disponivel = Math.max(limite - utilizado, 0);
+            const uso = limite > 0 ? Math.min((utilizado / limite) * 100, 100) : 0;
             return (
               <article key={cartao.id} className={`relative aspect-[1.586/1] min-h-48 w-[82vw] max-w-[320px] shrink-0 snap-start overflow-hidden rounded-[1.4rem] bg-gradient-to-br ${estilo.fundo} p-5 text-white shadow-lg transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:min-h-0 sm:min-w-0 sm:w-auto sm:max-w-none`}>
                 <div className="absolute -right-12 -top-16 size-44 rounded-full bg-white/10" />
@@ -226,9 +229,9 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
 
       {cartaoFaturas && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartaoFaturas(null); }}>
-          <div className="modal-panel max-w-3xl">
+          <div ref={faturaDialogRef} className="modal-panel max-w-3xl" role="dialog" aria-modal="true" aria-labelledby="titulo-faturas-cartao" tabIndex={-1}>
             <header className="flex items-start justify-between gap-4">
-              <div><p className="text-sm font-medium text-primary">Histórico do cartão</p><h2 className="mt-1 text-xl font-semibold">Faturas de {cartaoFaturas.nome}</h2><p className="mt-1 text-sm text-muted-foreground">{cartaoFaturas.instituicao} · vence no dia {cartaoFaturas.dia_vencimento}</p></div>
+              <div><p className="text-sm font-medium text-primary">Histórico do cartão</p><h2 id="titulo-faturas-cartao" className="mt-1 text-xl font-semibold">Faturas de {cartaoFaturas.nome}</h2><p className="mt-1 text-sm text-muted-foreground">{cartaoFaturas.instituicao} · vence no dia {cartaoFaturas.dia_vencimento}</p></div>
               <button type="button" className="icon-button" onClick={() => setCartaoFaturas(null)} aria-label="Fechar histórico de faturas"><X size={18} /></button>
             </header>
 

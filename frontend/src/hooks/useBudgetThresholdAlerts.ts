@@ -28,7 +28,7 @@ export function useBudgetThresholdAlerts({ usuarioId, mes, ano, orcamentos, movi
       if (!Number.isFinite(limite) || limite <= 0) continue;
 
       const gasto = movimentacoes
-        .filter((item) => item.tipo === "despesa" && item.categoria === orcamento.categoria)
+        .filter((item) => item.tipo === "despesa" && item.impacta_resultado !== false && item.categoria === orcamento.categoria)
         .reduce((total, item) => total + Number(item.valor), 0);
       const marco = marcoAlcancado((gasto / limite) * 100);
       if (!marco) continue;

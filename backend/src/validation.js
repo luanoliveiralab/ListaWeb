@@ -1,6 +1,6 @@
 const { HttpError } = require("./http");
 
-const FOTO_MAX_BYTES = 3 * 1024 * 1024;
+const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 const FOTO_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function frontendUrlPrincipal() {
@@ -27,7 +27,7 @@ function validarFotoDataUrl(foto) {
         throw new HttpError(400, "A imagem enviada é inválida.", "FOTO_INVALIDA");
     }
     if (bytes.length > FOTO_MAX_BYTES) {
-        throw new HttpError(413, "A foto é muito grande. O limite é 3 MB.", "FOTO_MUITO_GRANDE");
+        throw new HttpError(413, "A foto é muito grande. O limite é 2 MB.", "FOTO_MUITO_GRANDE");
     }
     return foto;
 }

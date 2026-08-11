@@ -4,6 +4,7 @@ export interface Cartao {
   nome: string;
   instituicao: string;
   limite_disponivel: number | string;
+  limite_utilizado?: number | string;
   dia_vencimento: number;
   created_at: string;
 }

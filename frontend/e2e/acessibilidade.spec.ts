@@ -48,3 +48,20 @@ test("diálogo de confirmação recebe foco e fecha pelo teclado", async ({ page
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { name: "Excluir esta categoria?" })).not.toBeVisible();
 });
+
+test("modal de edição mantém o foco e fecha com Escape", async ({ page }) => {
+  await prepararApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("E-mail").fill(usuario.email);
+  await page.getByPlaceholder("Senha").fill("senha-segura-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.goto("/financas");
+  await page.getByRole("button", { name: "Editar Mercado" }).click();
+
+  const modal = page.getByRole("dialog", { name: "Editar movimentação" });
+  await expect(modal).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("[role='dialog']")))).toBe(true);
+  await esperarSemViolacoesCriticas(page);
+  await page.keyboard.press("Escape");
+  await expect(modal).not.toBeVisible();
+});

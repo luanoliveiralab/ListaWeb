@@ -1,3 +1,5 @@
+import { limparSessaoLocal } from "@/lib/userSession";
+
 const API_URL =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 let csrfEmAndamento: Promise<string> | null = null;
@@ -7,46 +9,63 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
     skipCsrf?: boolean;
 }
 
+async function obterCsrf(forcar = false) {
+    if (typeof window === "undefined") return null;
+    if (forcar) sessionStorage.removeItem("csrfToken");
+    const existente = sessionStorage.getItem("csrfToken");
+    if (existente) return existente;
+
+    csrfEmAndamento ??= fetch(`${API_URL}/csrf`, { credentials: "include" })
+        .then(async (response) => {
+            if (!response.ok) throw new Error("Não foi possível preparar a sessão segura.");
+            const data = await response.json();
+            if (typeof data.csrfToken !== "string" || !data.csrfToken) {
+                throw new Error("A API não retornou uma sessão segura válida.");
+            }
+            sessionStorage.setItem("csrfToken", data.csrfToken);
+            return data.csrfToken as string;
+        })
+        .finally(() => { csrfEmAndamento = null; });
+    return csrfEmAndamento;
+}
+
 async function request(endpoint: string, options: RequestOptions = {}) {
     const { body, headers, skipCsrf = false, ...rest } = options;
     const metodo = (rest.method ?? "GET").toUpperCase();
-    let csrfToken = typeof window !== "undefined" ? sessionStorage.getItem("csrfToken") : null;
+    const mutacao = !["GET", "HEAD", "OPTIONS"].includes(metodo);
+    let csrfToken = mutacao && !skipCsrf ? await obterCsrf() : null;
 
-    if (!["GET", "HEAD", "OPTIONS"].includes(metodo) && !skipCsrf && !csrfToken) {
-        csrfEmAndamento ??= fetch(`${API_URL}/csrf`, { credentials: "include" })
-            .then(async (csrfResponse) => {
-                if (!csrfResponse.ok) throw new Error("Não foi possível preparar a sessão segura.");
-                const csrfData = await csrfResponse.json();
-                sessionStorage.setItem("csrfToken", csrfData.csrfToken);
-                return csrfData.csrfToken as string;
-            })
-            .finally(() => { csrfEmAndamento = null; });
-        csrfToken = await csrfEmAndamento;
+    async function executar(token: string | null) {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { "X-CSRF-Token": token } : {}),
+                ...headers,
+            },
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+            ...rest,
+        });
+        const contentType = response.headers.get("content-type") ?? "";
+        const data = contentType.includes("application/json")
+            ? await response.json()
+            : { mensagem: (await response.text()).trim() };
+        return { response, data };
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-            ...(csrfToken && !["GET", "HEAD", "OPTIONS"].includes(metodo) ? { "X-CSRF-Token": csrfToken } : {}),
-            ...headers,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        ...rest,
-    });
-
-    const contentType = response.headers.get("content-type") ?? "";
-    const data = contentType.includes("application/json")
-        ? await response.json()
-        : { mensagem: (await response.text()).trim() };
+    let resultado = await executar(csrfToken);
+    if (mutacao && !skipCsrf && resultado.response.status === 403 && resultado.data.codigo === "CSRF_INVALIDO") {
+        csrfToken = await obterCsrf(true);
+        resultado = await executar(csrfToken);
+    }
+    const { response, data } = resultado;
 
     if (data.csrfToken && typeof window !== "undefined") {
         sessionStorage.setItem("csrfToken", data.csrfToken);
     }
 
-    if (response.status === 401 && typeof window !== "undefined") {
-        localStorage.removeItem("usuario");
-        sessionStorage.removeItem("csrfToken");
+    if (response.status === 401 && data.codigo === "SESSAO_INVALIDA" && typeof window !== "undefined") {
+        limparSessaoLocal();
         if (window.location.pathname !== "/") window.location.replace("/");
     }
 
@@ -80,8 +99,9 @@ export const api = {
             body,
         }),
 
-    delete: (endpoint: string) =>
+    delete: (endpoint: string, body?: unknown) =>
         request(endpoint, {
             method: "DELETE",
+            body,
         }),
 };

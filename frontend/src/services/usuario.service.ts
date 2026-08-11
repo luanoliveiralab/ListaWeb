@@ -2,7 +2,7 @@ import { api } from "./api";
 import type { Usuario } from "@/types/Usuario";
 
 export const usuarioService = {
-    atualizar(id: number, dados: Partial<Usuario>) {
+    atualizar(id: number, dados: Partial<Usuario> & { senhaAtual?: string }) {
         return api.put(`/usuarios/${id}`, dados);
     },
 

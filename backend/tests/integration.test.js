@@ -36,6 +36,7 @@ test("emite token CSRF e bloqueia escrita sem ele", async () => {
 test("rota privada rejeita acesso sem sessão", async () => {
     const response = await fetch(`${baseUrl}/me`);
     assert.equal(response.status, 401);
+    assert.equal((await response.json()).codigo, "SESSAO_INVALIDA");
 });
 
 test("categorias globais ficam isoladas por sessão", async () => {

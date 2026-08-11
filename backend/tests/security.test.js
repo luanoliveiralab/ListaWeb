@@ -66,6 +66,7 @@ test("bloqueia alteração sem token CSRF correspondente", () => {
     };
     protegerCsrf(req, res, () => assert.fail("Não deveria prosseguir"));
     assert.equal(res.statusCode, 403);
+    assert.equal(res.payload.codigo, "CSRF_INVALIDO");
 });
 
 test("aceita alteração com token CSRF correspondente", () => {

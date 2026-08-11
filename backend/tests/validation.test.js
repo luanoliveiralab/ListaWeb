@@ -15,6 +15,7 @@ test("aceita somente imagens data URL válidas e dentro do limite", () => {
     assert.equal(validarFotoDataUrl(gif), gif);
     assert.throws(() => validarFotoDataUrl("<svg onload=alert(1)>"), /JPG, PNG, WebP ou GIF/);
     assert.throws(() => validarFotoDataUrl("data:image/svg+xml;base64,PHN2Zz4="), /JPG, PNG, WebP ou GIF/);
+    assert.throws(() => validarFotoDataUrl(`data:image/png;base64,${Buffer.alloc(2 * 1024 * 1024 + 1).toString("base64")}`), /2 MB/);
 });
 
 test("não converte textos em booleanos silenciosamente", () => {

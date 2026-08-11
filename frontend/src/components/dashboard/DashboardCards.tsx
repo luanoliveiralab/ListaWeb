@@ -63,7 +63,7 @@ export default function DashboardCards({
         .reduce((totalFatura, mov) => totalFatura + Number(mov.valor), 0)
     : 0;
   const creditoDisponivel = cartaoAtual
-    ? Math.max(Number(cartaoAtual.limite_disponivel) - faturaAtual, 0)
+    ? Math.max(Number(cartaoAtual.limite_disponivel) - Number(cartaoAtual.limite_utilizado ?? faturaAtual), 0)
     : 0;
   const coresCartao = cartaoAtual
     ? coresInstituicoes[cartaoAtual.instituicao] ?? { texto: "text-violet-700 dark:text-violet-300", fundo: "bg-violet-500/15" }

@@ -6,6 +6,15 @@ const { idPositivo, periodoValido } = require("../http");
 const router = express.Router();
 router.use(autenticar);
 
+const VALOR_MAXIMO = 9_999_999_999.99;
+
+function dataIsoValida(valor) {
+    if (valor === undefined || valor === null || valor === "") return null;
+    if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return undefined;
+    const data = new Date(`${valor}T12:00:00Z`);
+    return Number.isNaN(data.getTime()) || data.toISOString().slice(0, 10) !== valor ? undefined : valor;
+}
+
 router.get("/", async (req, res, next) => {
     try {
         const result = await pool.query("SELECT * FROM recorrencias WHERE usuario_id = $1 ORDER BY ativa DESC, dia, descricao", [req.usuarioId]);
@@ -15,14 +24,25 @@ router.get("/", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
     const { tipo, descricao, valor, categoria, dia, inicio, fim } = req.body;
-    if (!["receita", "despesa"].includes(tipo) || !descricao?.trim() || !categoria?.trim() || !(Number(valor) > 0) || !Number.isInteger(Number(dia)) || Number(dia) < 1 || Number(dia) > 28) {
+    const valorNumero = Number(valor);
+    const inicioNormalizado = dataIsoValida(inicio);
+    const fimNormalizado = dataIsoValida(fim);
+    if (
+        !["receita", "despesa"].includes(tipo) ||
+        typeof descricao !== "string" || !descricao.trim() || descricao.trim().length > 255 ||
+        typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80 ||
+        !Number.isFinite(valorNumero) || valorNumero <= 0 || valorNumero > VALOR_MAXIMO ||
+        !Number.isInteger(Number(dia)) || Number(dia) < 1 || Number(dia) > 28 ||
+        inicioNormalizado === undefined || fimNormalizado === undefined ||
+        (inicioNormalizado && fimNormalizado && fimNormalizado < inicioNormalizado)
+    ) {
         return res.status(400).json({ mensagem: "Dados da recorrência inválidos." });
     }
     try {
         const result = await pool.query(
             `INSERT INTO recorrencias (usuario_id, tipo, descricao, valor, categoria, dia, inicio, fim)
              VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,CURRENT_DATE),$8) RETURNING *`,
-            [req.usuarioId, tipo, descricao.trim(), Number(valor), categoria.trim(), Number(dia), inicio || null, fim || null]
+            [req.usuarioId, tipo, descricao.trim(), valorNumero, categoria.trim(), Number(dia), inicioNormalizado, fimNormalizado]
         );
         return res.status(201).json(result.rows[0]);
     } catch (error) { return next(error); }
@@ -31,8 +51,11 @@ router.post("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
     let id;
     try { id = idPositivo(req.params.id, "ID da recorrência"); } catch (error) { return next(error); }
+    if (typeof req.body.ativa !== "boolean") {
+        return res.status(400).json({ mensagem: "O estado da recorrência deve ser verdadeiro ou falso." });
+    }
     try {
-        const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [Boolean(req.body.ativa), id, req.usuarioId]);
+        const result = await pool.query("UPDATE recorrencias SET ativa = $1 WHERE id = $2 AND usuario_id = $3 RETURNING *", [req.body.ativa, id, req.usuarioId]);
         if (!result.rowCount) return res.status(404).json({ mensagem: "Recorrência não encontrada." });
         return res.json(result.rows[0]);
     } catch (error) { return next(error); }

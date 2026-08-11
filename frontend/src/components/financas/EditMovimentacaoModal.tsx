@@ -7,6 +7,7 @@ import type { Cartao } from "@/types/Cartao";
 import { useToast } from "@/providers/ToastProvider";
 import { useCategorias } from "@/hooks/useCategorias";
 import AppSelect from "@/components/shared/AppSelect";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 interface Props {
     aberto: boolean;
@@ -47,6 +48,7 @@ export default function EditMovimentacaoModal({
     const { categorias } = useCategorias(tipo, "financas");
 
     const { mostrarAviso } = useToast();
+    const panelRef = useAccessibleDialog(aberto, onFechar);
 
     if (!aberto || !movimentacao) return null;
 
@@ -133,9 +135,9 @@ export default function EditMovimentacaoModal({
     }
 
     return (
-        <div className="modal-backdrop">
-            <div className="modal-panel">
-                <h2 className="mb-6 text-2xl font-bold">
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onFechar(); }}>
+            <div ref={panelRef} className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="titulo-editar-movimentacao" tabIndex={-1}>
+                <h2 id="titulo-editar-movimentacao" className="mb-6 text-2xl font-bold">
                     Editar movimentação
                 </h2>
 
@@ -144,11 +146,12 @@ export default function EditMovimentacaoModal({
                     {/* TIPO */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-movimentacao-tipo" className="mb-2 block text-sm font-medium">
                             Tipo
                         </label>
 
                         <AppSelect
+                            id="editar-movimentacao-tipo"
                             value={tipo}
                             onValueChange={(value) => {
                                 setTipo(value as "receita" | "despesa");
@@ -164,26 +167,27 @@ export default function EditMovimentacaoModal({
 
                     {tipo === "despesa" && (
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Forma de pagamento</label>
-                            <AppSelect value={formaPagamento} onValueChange={(value) => { const forma = value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} />
+                            <label htmlFor="editar-movimentacao-forma" className="mb-2 block text-sm font-medium">Forma de pagamento</label>
+                            <AppSelect id="editar-movimentacao-forma" value={formaPagamento} onValueChange={(value) => { const forma = value as "saldo" | "credito"; setFormaPagamento(forma); if (forma === "saldo") setCartaoId(""); }} options={[{ value: "saldo", label: "Usar saldo" }, { value: "credito", label: "Cartão de crédito", disabled: cartoes.length === 0 }]} />
                         </div>
                     )}
 
                     {tipo === "despesa" && formaPagamento === "credito" && (
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Cartão</label>
-                            <AppSelect value={cartaoId} onValueChange={setCartaoId} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} />
+                            <label htmlFor="editar-movimentacao-cartao" className="mb-2 block text-sm font-medium">Cartão</label>
+                            <AppSelect id="editar-movimentacao-cartao" value={cartaoId} onValueChange={setCartaoId} placeholder="Selecionar cartão" options={cartoes.map((cartao) => ({ value: String(cartao.id), label: `${cartao.nome} · ${cartao.instituicao}` }))} />
                         </div>
                     )}
 
                     {/* DESCRIÇÃO */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-movimentacao-descricao" className="mb-2 block text-sm font-medium">
                             Descrição
                         </label>
 
                         <input
+                            id="editar-movimentacao-descricao"
                             type="text"
                             className="control"
                             placeholder="Inserir"
@@ -199,11 +203,12 @@ export default function EditMovimentacaoModal({
 
                     {ehItemDaLista && (
                         <div>
-                            <label className="mb-2 block text-sm font-medium">
+                            <label htmlFor="editar-movimentacao-quantidade" className="mb-2 block text-sm font-medium">
                                 Quantidade
                             </label>
 
                             <input
+                                id="editar-movimentacao-quantidade"
                                 type="number"
                                 min="1"
                                 step="1"
@@ -224,11 +229,12 @@ export default function EditMovimentacaoModal({
                     {/* VALOR */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-movimentacao-valor" className="mb-2 block text-sm font-medium">
                             Valor (R$)
                         </label>
 
                         <input
+                            id="editar-movimentacao-valor"
                             type="number"
                             min="0"
                             step="0.01"
@@ -244,11 +250,12 @@ export default function EditMovimentacaoModal({
                     {/* CATEGORIA */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-movimentacao-categoria" className="mb-2 block text-sm font-medium">
                             Categoria
                         </label>
 
                         <AppSelect
+                            id="editar-movimentacao-categoria"
                             value={categoria}
                             onValueChange={setCategoria}
                             placeholder="Selecionar categoria"
@@ -264,6 +271,7 @@ export default function EditMovimentacaoModal({
 
                 <div className="modal-actions">
                     <button
+                        type="button"
                         onClick={onFechar}
                         className="button-secondary"
                     >
@@ -271,6 +279,7 @@ export default function EditMovimentacaoModal({
                     </button>
 
                     <button
+                        type="button"
                         onClick={salvar}
                         className="button-primary"
                     >

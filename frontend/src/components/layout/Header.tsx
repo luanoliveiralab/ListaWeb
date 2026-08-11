@@ -4,6 +4,8 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import NotificationCenter from "./NotificationCenter";
+import { limparSessaoLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface HeaderProps {
   titulo: string;
@@ -17,6 +19,7 @@ export default function Header({
   nome,
 }: HeaderProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   async function sair() {
     try {
@@ -24,8 +27,8 @@ export default function Header({
     } catch {
       // A limpeza local ainda encerra a interface se a API estiver indisponível.
     }
-    localStorage.removeItem("usuario");
-    sessionStorage.removeItem("csrfToken");
+    limparSessaoLocal();
+    queryClient.clear();
     router.replace("/");
   }
 

@@ -9,11 +9,14 @@ import { authService } from "@/services/auth.service";
 
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import PasswordInput from "@/components/auth/PasswordInput";
+import { salvarUsuarioLocal } from "@/lib/userSession";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/providers/ToastProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const { mostrarAviso } = useToast();
@@ -42,10 +45,8 @@ export default function LoginPage() {
         senha,
       });
 
-      localStorage.setItem(
-        "usuario",
-        JSON.stringify(data.usuario)
-      );
+      queryClient.clear();
+      salvarUsuarioLocal(data.usuario);
       sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
 
       router.replace("/dashboard");

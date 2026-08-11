@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { ItemLista } from "@/types/ItemLista";
 import { useToast } from "@/providers/ToastProvider";
 import { useCategorias } from "@/hooks/useCategorias";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 interface Props {
     aberto: boolean;
@@ -34,6 +35,7 @@ export default function EditItemModal({
 
     const { mostrarAviso } = useToast();
     const { categorias } = useCategorias("despesa", "lista");
+    const panelRef = useAccessibleDialog(aberto, onFechar);
 
     if (!aberto || !item) return null;
 
@@ -99,10 +101,10 @@ export default function EditItemModal({
     }
 
     return (
-        <div className="modal-backdrop">
-            <div className="modal-panel">
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onFechar(); }}>
+            <div ref={panelRef} className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="titulo-editar-item" tabIndex={-1}>
 
-                <h2 className="mb-6 text-2xl font-bold">
+                <h2 id="titulo-editar-item" className="mb-6 text-2xl font-bold">
                     Editar item
                 </h2>
 
@@ -111,11 +113,12 @@ export default function EditItemModal({
                     {/* NOME */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-item-nome" className="mb-2 block text-sm font-medium">
                             Nome
                         </label>
 
                         <input
+                            id="editar-item-nome"
                             type="text"
                             className="control"
                             placeholder="Inserir"
@@ -129,11 +132,12 @@ export default function EditItemModal({
                     {/* QUANTIDADE */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-item-quantidade" className="mb-2 block text-sm font-medium">
                             Quantidade
                         </label>
 
                         <input
+                            id="editar-item-quantidade"
                             type="number"
                             min="1"
                             step="1"
@@ -149,11 +153,12 @@ export default function EditItemModal({
                     {/* VALOR */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-item-valor" className="mb-2 block text-sm font-medium">
                             Valor (R$)
                         </label>
 
                         <input
+                            id="editar-item-valor"
                             type="number"
                             min="0"
                             step="0.01"
@@ -169,11 +174,12 @@ export default function EditItemModal({
                     {/* CATEGORIA */}
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="editar-item-categoria" className="mb-2 block text-sm font-medium">
                             Categoria
                         </label>
 
                         <AppSelect
+                            id="editar-item-categoria"
                             value={categoria}
                             onValueChange={setCategoria}
                             placeholder="Selecionar categoria"
@@ -191,6 +197,7 @@ export default function EditItemModal({
                 <div className="modal-actions">
 
                     <button
+                        type="button"
                         onClick={onFechar}
                         className="button-secondary"
                     >
@@ -198,6 +205,7 @@ export default function EditItemModal({
                     </button>
 
                     <button
+                        type="button"
                         onClick={salvar}
                         className="button-primary"
                     >

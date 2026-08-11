@@ -56,7 +56,10 @@ function protegerCsrf(req, res, next) {
 
     if (!cookieToken || !headerToken || cookieToken.length !== headerToken.length ||
         !crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
-        return res.status(403).json({ mensagem: "Validação de segurança da sessão falhou." });
+        return res.status(403).json({
+            mensagem: "Validação de segurança da sessão falhou.",
+            codigo: "CSRF_INVALIDO",
+        });
     }
 
     return next();

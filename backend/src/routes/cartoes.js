@@ -15,7 +15,21 @@ function parametrosFatura(req) {
 
 router.get("/", asyncHandler(async (req, res) => {
     const result = await pool.query(
-        "SELECT * FROM cartoes WHERE usuario_id = $1 ORDER BY created_at DESC, id DESC",
+        `SELECT c.*,
+                COALESCE((
+                    SELECT SUM(m.valor)
+                    FROM movimentacoes m
+                    WHERE m.usuario_id = c.usuario_id AND m.cartao_id = c.id
+                      AND m.tipo = 'despesa' AND m.forma_pagamento = 'credito'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM faturas_cartao f
+                          WHERE f.cartao_id = m.cartao_id AND f.usuario_id = m.usuario_id
+                            AND f.ano = EXTRACT(YEAR FROM m.data)::integer
+                            AND f.mes = EXTRACT(MONTH FROM m.data)::integer
+                            AND f.status = 'paga'
+                      )
+                ), 0)::numeric(12,2) AS limite_utilizado
+         FROM cartoes c WHERE c.usuario_id = $1 ORDER BY c.created_at DESC, c.id DESC`,
         [req.usuarioId]
     );
     return res.json(result.rows);
@@ -28,7 +42,7 @@ router.post("/", asyncHandler(async (req, res) => {
     if (
         typeof nome !== "string" || !nome.trim() || nome.trim().length > 80 ||
         typeof instituicao !== "string" || !instituicao.trim() || instituicao.trim().length > 80 ||
-        !Number.isFinite(limite) || limite < 0 ||
+        !Number.isFinite(limite) || limite < 0 || limite > 9_999_999_999.99 ||
         !Number.isInteger(vencimento) || vencimento < 1 || vencimento > 31
     ) return res.status(400).json({ mensagem: "Dados do cartão inválidos." });
 
@@ -68,7 +82,11 @@ router.get("/:id/faturas", asyncHandler(async (req, res) => {
          SELECT p.ano, p.mes, COALESCE(f.status, 'aberta') AS status,
                 COALESCE(SUM(m.valor), 0)::numeric(12,2) AS total, COUNT(m.id)::int AS quantidade,
                 f.fechada_em, f.paga_em,
-                make_date(p.ano, p.mes, LEAST($3, 28)) + INTERVAL '1 month' AS vencimento
+                make_date(p.ano, p.mes, 1) + INTERVAL '1 month'
+                  + (LEAST(
+                        $3,
+                        EXTRACT(DAY FROM (make_date(p.ano, p.mes, 1) + INTERVAL '2 months - 1 day'))::integer
+                    ) - 1) * INTERVAL '1 day' AS vencimento
          FROM periodos p
          LEFT JOIN faturas_cartao f ON f.cartao_id = $2 AND f.ano = p.ano AND f.mes = p.mes
          LEFT JOIN movimentacoes m ON m.usuario_id = $1 AND m.cartao_id = $2

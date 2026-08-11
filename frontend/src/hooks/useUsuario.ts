@@ -5,28 +5,18 @@ import { useEffect, useState } from "react";
 
 import type { Usuario } from "@/types/Usuario";
 import { authService } from "@/services/auth.service";
-
-let usuarioEmMemoria: Usuario | null = null;
+import { carregarUsuarioLocal, obterUsuarioEmMemoria, salvarUsuarioLocal } from "@/lib/userSession";
 
 export function useUsuario() {
   const router = useRouter();
-  const [usuario, setUsuario] = useState<Usuario | null>(usuarioEmMemoria);
+  const [usuario, setUsuario] = useState<Usuario | null>(obterUsuarioEmMemoria());
 
   useEffect(() => {
     let ativo = true;
 
-    const usuarioSalvo = localStorage.getItem("usuario");
-    if (usuarioSalvo) {
-      try {
-        const usuarioEmCache = JSON.parse(usuarioSalvo);
-        usuarioEmMemoria = usuarioEmCache;
-        queueMicrotask(() => {
-          if (ativo) setUsuario(usuarioEmCache);
-        });
-      } catch {
-        localStorage.removeItem("usuario");
-      }
-    }
+    const usuarioEmCache = carregarUsuarioLocal();
+    const usuarioSalvo = Boolean(usuarioEmCache);
+    if (usuarioEmCache) queueMicrotask(() => { if (ativo) setUsuario(usuarioEmCache); });
 
     const ultimaValidacao = Number(sessionStorage.getItem("usuarioValidadoEm"));
     if (usuarioSalvo && Date.now() - ultimaValidacao < 60_000) {
@@ -36,8 +26,7 @@ export function useUsuario() {
     authService.me()
       .then((usuarioAtual: Usuario) => {
         if (!ativo) return;
-        localStorage.setItem("usuario", JSON.stringify(usuarioAtual));
-        usuarioEmMemoria = usuarioAtual;
+        salvarUsuarioLocal(usuarioAtual);
         sessionStorage.setItem("usuarioValidadoEm", String(Date.now()));
         setUsuario(usuarioAtual);
       })
@@ -48,8 +37,7 @@ export function useUsuario() {
   }, [router]);
 
   function atualizarUsuario(novoUsuario: Usuario) {
-    localStorage.setItem("usuario", JSON.stringify(novoUsuario));
-    usuarioEmMemoria = novoUsuario;
+    salvarUsuarioLocal(novoUsuario);
     setUsuario(novoUsuario);
   }
 

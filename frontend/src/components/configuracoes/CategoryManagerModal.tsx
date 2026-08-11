@@ -8,6 +8,7 @@ import { categoriasQueryKey, useCategorias } from "@/hooks/useCategorias";
 import { useToast } from "@/providers/ToastProvider";
 import type { Categoria } from "@/types/Categoria";
 import AppSelect from "@/components/shared/AppSelect";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -26,6 +27,7 @@ export default function CategoryManagerModal({ aberto, onFechar }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [categoriaParaExcluir, setCategoriaParaExcluir] = useState<Categoria | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const panelRef = useAccessibleDialog(aberto, fechar);
 
   if (!aberto) return null;
 
@@ -62,7 +64,7 @@ export default function CategoryManagerModal({ aberto, onFechar }: Props) {
   }
 
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-categorias">
-    <div data-testid="categorias-modal" className="modal-panel flex h-[min(90vh,48rem)] max-w-4xl flex-col" style={{ overflow: "hidden", padding: 0 }}>
+    <div ref={panelRef} data-testid="categorias-modal" className="modal-panel flex h-[min(90vh,48rem)] max-w-4xl flex-col" style={{ overflow: "hidden", padding: 0 }} tabIndex={-1}>
       <header className="shrink-0 flex items-start justify-between gap-4 border-b border-border p-5 sm:p-6">
         <div className="flex gap-3"><span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Tags size={21} /></span><div><h2 id="titulo-categorias" className="text-xl font-semibold">Categorias do projeto</h2><p className="mt-1 text-sm text-muted-foreground">Personalize as opções usadas em compras, finanças e planejamento.</p></div></div>
         <button type="button" onClick={fechar} className="icon-button" aria-label="Fechar"><X size={20} /></button>

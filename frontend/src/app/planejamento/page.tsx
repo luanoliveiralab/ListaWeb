@@ -134,6 +134,7 @@ export default function PlanejamentoPage() {
     try {
       const nova = await planejamentoService.criarMeta({ nome: meta.nome.trim(), valor_alvo: numeroMoeda(meta.valor_alvo), valor_atual: meta.valor_atual ? numeroMoeda(meta.valor_atual) : 0, prazo: meta.prazo || null });
       atualizarMetas((itens) => [nova, ...itens]);
+      sincronizarFinancas();
       setMeta({ nome: "", valor_alvo: "", valor_atual: "", prazo: "" });
       setMetaAberta(false);
       mostrarAviso("Meta criada.");
@@ -236,7 +237,7 @@ export default function PlanejamentoPage() {
             {metas.map((item) => {
               const progresso = Math.min(100, Math.round(Number(item.valor_atual) / Number(item.valor_alvo) * 100));
               return <article key={item.id} className="planning-goal">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label={`Excluir meta ${item.nome}`} onClick={() => setExclusao({ tipo: "meta", item })}><Trash2 size={17} /></button></div>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-base">{item.nome}</strong>{item.concluida && <span className="status-pill active">Concluída</span>}</div><p className="planning-detail mt-1">{item.prazo ? `Prazo: ${new Date(`${item.prazo.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}` : "Sem prazo definido"}</p></div><button type="button" className="icon-button text-destructive" aria-label={`Excluir meta ${item.nome}`} onClick={() => { if (Number(item.valor_atual) > 0) { mostrarAviso("Retire o valor acumulado antes de excluir esta meta.", "alerta"); abrirMeta(item); } else setExclusao({ tipo: "meta", item }); }}><Trash2 size={17} /></button></div>
                 <div className="mt-4 flex items-end justify-between gap-3"><div><span className="text-xs text-muted-foreground">Valor acumulado</span><p className="font-semibold">{moeda.format(Number(item.valor_atual))} <span className="text-sm font-normal text-muted-foreground">de {moeda.format(Number(item.valor_alvo))}</span></p></div><strong className="text-primary">{progresso}%</strong></div>
                 <div className="progress-track" aria-label={`${progresso}% concluído`}><span style={{ width: `${progresso}%` }} /></div>
                 <button type="button" className="button-secondary mt-3 w-full" onClick={() => abrirMeta(item)}>Movimentar e ver histórico</button>

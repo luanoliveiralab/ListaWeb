@@ -18,8 +18,16 @@ const cartoesRouter = require("./src/routes/cartoes");
 const categoriasRouter = require("./src/routes/categorias");
 const { criarContextoRequisicao, rotaNaoEncontrada, tratarErro } = require("./src/http");
 const { frontendUrlPrincipal, validarFotoDataUrl } = require("./src/validation");
+const { buscarCartaoComUso, possuiLimite } = require("./src/credit");
 
 const app = express();
+const VALOR_MONETARIO_MAXIMO = 9_999_999_999.99;
+
+function dataIsoValida(valor) {
+    if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+    const data = new Date(`${valor}T12:00:00Z`);
+    return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
+}
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
@@ -59,7 +67,7 @@ app.use((req, res, next) => {
     res.set("Cache-Control", "private, no-store");
     next();
 });
-app.use(express.json({ limit: "4mb" }));
+app.use(express.json({ limit: "3mb" }));
 app.use(criarContextoRequisicao);
 
 app.get("/csrf", (req, res) => {
@@ -102,7 +110,8 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         typeof email !== "string" ||
         !email.trim() ||
         typeof senha !== "string" ||
-        !senha
+        !senha ||
+        senha.length > 128
     ) {
         return res.status(400).json({
             mensagem: "Preencha todos os campos.",
@@ -192,6 +201,9 @@ app.post("/cadastro", limitarTentativas(), async (req, res) => {
         if (usuarioIdCriado) {
             await pool.query("DELETE FROM usuarios WHERE id = $1", [usuarioIdCriado]).catch(() => undefined);
         }
+        if (err?.code === "23505") {
+            return res.status(409).json({ mensagem: "E-mail já cadastrado." });
+        }
         console.error(
             "Erro no cadastro:",
             err
@@ -251,8 +263,10 @@ app.post("/login", limitarTentativas(), async (req, res) => {
     if (
         typeof email !== "string" ||
         !email.trim() ||
+        email.trim().length > 255 ||
         typeof senha !== "string" ||
-        !senha
+        !senha ||
+        senha.length > 128
     ) {
         return res.status(400).json({
             mensagem:
@@ -347,7 +361,9 @@ app.post("/logout", (req, res) => {
 app.post("/esqueci-senha", limitarTentativas({ limite: 4, janelaMs: 30 * 60 * 1000 }), async (req, res) => {
     const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const resposta = { mensagem: "Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação." };
-    if (!email) return res.json(resposta);
+    if (!email || email.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        return res.status(400).json({ mensagem: "Informe um e-mail válido." });
+    }
 
     try {
         const usuarioResult = await pool.query("SELECT id, nome, email FROM usuarios WHERE LOWER(email) = LOWER($1)", [email]);
@@ -379,7 +395,7 @@ app.post("/esqueci-senha", limitarTentativas({ limite: 4, janelaMs: 30 * 60 * 10
 
 app.post("/redefinir-senha", limitarTentativas({ limite: 6, janelaMs: 30 * 60 * 1000 }), async (req, res) => {
     const { token, novaSenha } = req.body;
-    if (typeof token !== "string" || !token || typeof novaSenha !== "string" || novaSenha.length < 10 || novaSenha.length > 128) {
+    if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token) || typeof novaSenha !== "string" || novaSenha.length < 10 || novaSenha.length > 128) {
         return res.status(400).json({ mensagem: "Link ou nova senha inválidos." });
     }
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -413,7 +429,7 @@ app.get("/me", autenticar, async (req, res) => {
             "SELECT id, nome, email, foto FROM usuarios WHERE id = $1",
             [req.usuarioId]
         );
-        if (!result.rowCount) return res.status(401).json({ mensagem: "Sessão inválida." });
+        if (!result.rowCount) return res.status(401).json({ mensagem: "Sessão inválida.", codigo: "SESSAO_INVALIDA" });
         return res.json(result.rows[0]);
     } catch (err) {
         console.error("Erro ao validar sessão:", err);
@@ -430,6 +446,7 @@ app.put(
         const {
             nome,
             email,
+            senhaAtual,
         } = req.body;
 
         const usuarioId = Number(id);
@@ -471,9 +488,34 @@ app.put(
             return res.status(400).json({ mensagem: "Informe um nome e um e-mail válidos." });
         }
 
+        const client = await pool.connect();
         try {
+            await client.query("BEGIN");
+            const atual = await client.query(
+                "SELECT email, senha FROM usuarios WHERE id = $1 FOR UPDATE",
+                [usuarioId]
+            );
+            if (!atual.rowCount) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ mensagem: "Usuário não encontrado." });
+            }
+            const emailMudou = atual.rows[0].email.toLowerCase() !== emailLimpo;
+            if (emailMudou) {
+                if (typeof senhaAtual !== "string" || !senhaAtual || senhaAtual.length > 128) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ mensagem: "Informe sua senha atual para alterar o e-mail." });
+                }
+                const senhaValida = typeof atual.rows[0].senha === "string" && atual.rows[0].senha.startsWith("$2")
+                    ? await bcrypt.compare(senhaAtual, atual.rows[0].senha)
+                    : false;
+                if (!senhaValida) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ mensagem: "Senha atual incorreta." });
+                }
+            }
+
             const emailExistente =
-                await pool.query(
+                await client.query(
                     `SELECT id
                      FROM usuarios
                      WHERE LOWER(email) = LOWER($1)
@@ -484,6 +526,7 @@ app.put(
             if (
                 emailExistente.rowCount > 0
             ) {
+                await client.query("ROLLBACK");
                 return res.status(400).json({
                     mensagem:
                         "Este e-mail já está sendo usado.",
@@ -491,28 +534,58 @@ app.put(
             }
 
             const result =
-                await pool.query(
+                await client.query(
                     `UPDATE usuarios
                      SET nome = $1,
-                         email = $2
+                         email = $2,
+                         email_verificado = CASE WHEN $4 THEN FALSE ELSE email_verificado END,
+                         token_version = token_version + CASE WHEN $4 THEN 1 ELSE 0 END
                      WHERE id = $3
                      RETURNING id, nome, email, foto`,
-                    [nomeLimpo, emailLimpo, usuarioId]
+                    [nomeLimpo, emailLimpo, usuarioId, emailMudou]
                 );
 
             if (
                 result.rowCount === 0
             ) {
+                await client.query("ROLLBACK");
                 return res.status(404).json({
                     mensagem:
                         "Usuário não encontrado.",
                 });
             }
 
-            return res.json(
-                result.rows[0]
-            );
+            if (emailMudou) {
+                const tokenVerificacao = crypto.randomBytes(32).toString("hex");
+                const tokenHash = crypto.createHash("sha256").update(tokenVerificacao).digest("hex");
+                await client.query("DELETE FROM verificacoes_email WHERE usuario_id = $1", [usuarioId]);
+                await client.query(
+                    `INSERT INTO verificacoes_email (usuario_id, token_hash, expira_em)
+                     VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+                    [usuarioId, tokenHash]
+                );
+                await enviarEmailVerificacao({
+                    destinatario: emailLimpo,
+                    nome: nomeLimpo,
+                    link: `${frontendUrlPrincipal()}/verificar-email?token=${tokenVerificacao}`,
+                });
+            }
+
+            await client.query("COMMIT");
+            if (emailMudou) {
+                const options = cookieOptions();
+                delete options.maxAge;
+                res.clearCookie("listaweb_token", options);
+                res.clearCookie("listaweb_csrf", csrfCookieOptions());
+                return res.json({
+                    usuario: result.rows[0],
+                    email_verification_required: true,
+                    mensagem: "Confirme o novo e-mail para entrar novamente.",
+                });
+            }
+            return res.json(result.rows[0]);
         } catch (err) {
+            await client.query("ROLLBACK").catch(() => undefined);
             if (err?.code === "23505") {
                 return res.status(400).json({ mensagem: "Este e-mail já está sendo usado." });
             }
@@ -525,7 +598,7 @@ app.put(
                 mensagem:
                     "Erro ao atualizar usuário.",
             });
-        }
+        } finally { client.release(); }
     }
 );
 
@@ -536,8 +609,10 @@ app.put(
 app.delete(
     "/usuarios/:id",
     autenticar,
+    limitarTentativas({ limite: 5, janelaMs: 30 * 60 * 1000 }),
     async (req, res) => {
         const { id } = req.params;
+        const { senhaAtual } = req.body;
 
         if (
             Number(id) !==
@@ -549,11 +624,31 @@ app.delete(
             });
         }
 
+        if (typeof senhaAtual !== "string" || !senhaAtual || senhaAtual.length > 128) {
+            return res.status(400).json({ mensagem: "Confirme sua senha atual para excluir a conta." });
+        }
+
         const client =
             await pool.connect();
 
         try {
             await client.query("BEGIN");
+
+            const usuarioAtual = await client.query(
+                "SELECT senha FROM usuarios WHERE id = $1 FOR UPDATE",
+                [req.usuarioId]
+            );
+            if (!usuarioAtual.rowCount) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ mensagem: "Usuário não encontrado." });
+            }
+            const senhaValida = typeof usuarioAtual.rows[0].senha === "string" && usuarioAtual.rows[0].senha.startsWith("$2")
+                ? await bcrypt.compare(senhaAtual, usuarioAtual.rows[0].senha)
+                : false;
+            if (!senhaValida) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ mensagem: "Senha atual incorreta." });
+            }
 
             await client.query(
                 `DELETE FROM movimentacoes
@@ -595,6 +690,12 @@ app.delete(
             }
 
             await client.query("COMMIT");
+            limparTentativas(req);
+
+            const options = cookieOptions();
+            delete options.maxAge;
+            res.clearCookie("listaweb_token", options);
+            res.clearCookie("listaweb_csrf", csrfCookieOptions());
 
             return res.json({
                 mensagem:
@@ -853,7 +954,8 @@ app.post(
 
         if (
             typeof nome !== "string" ||
-            !nome.trim()
+            !nome.trim() ||
+            nome.trim().length > 255
         ) {
             return res.status(400).json({
                 mensagem:
@@ -881,13 +983,18 @@ app.post(
             (
                 typeof valor !== "number" ||
                 !Number.isFinite(valor) ||
-                valor < 0
+                valor < 0 ||
+                valor > VALOR_MONETARIO_MAXIMO
             )
         ) {
             return res.status(400).json({
                 mensagem:
                     "Valor inválido.",
             });
+        }
+
+        if (categoria !== undefined && (typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80)) {
+            return res.status(400).json({ mensagem: "Categoria inválida." });
         }
 
         try {
@@ -996,7 +1103,8 @@ app.put(
             nome !== undefined &&
             (
                 typeof nome !== "string" ||
-                !nome.trim()
+                !nome.trim() ||
+                nome.trim().length > 255
             )
         ) {
             return res.status(400).json({
@@ -1025,13 +1133,18 @@ app.put(
             (
                 typeof valor !== "number" ||
                 !Number.isFinite(valor) ||
-                valor < 0
+                valor < 0 ||
+                valor > VALOR_MONETARIO_MAXIMO
             )
         ) {
             return res.status(400).json({
                 mensagem:
                     "Valor inválido.",
             });
+        }
+
+        if (categoria !== undefined && (typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80)) {
+            return res.status(400).json({ mensagem: "Categoria inválida." });
         }
 
         try {
@@ -1062,6 +1175,15 @@ app.put(
                 return res.status(403).json({
                     mensagem:
                         "Você não pode alterar este item.",
+                });
+            }
+
+            if (
+                item.comprado &&
+                (comprado === false || nome !== undefined || quantidade !== undefined || categoria !== undefined || valor !== undefined)
+            ) {
+                return res.status(409).json({
+                    mensagem: "Itens já comprados devem ser ajustados pelo lançamento em Finanças.",
                 });
             }
 
@@ -1138,8 +1260,12 @@ app.put(
                         return res.status(400).json({ mensagem: "Selecione um cartão válido." });
                     }
                     if (cartaoId) {
-                        const cartao = await cliente.query("SELECT 1 FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
-                        if (!cartao.rowCount) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
+                        const cartao = await buscarCartaoComUso(cliente, req.usuarioId, cartaoId, { bloquear: true });
+                        if (!cartao) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
+                        if (!possuiLimite(cartao, Number(itemAtualizado.valor))) {
+                            await cliente.query("ROLLBACK");
+                            return res.status(409).json({ mensagem: "Limite de crédito insuficiente neste cartão." });
+                        }
                         const hoje = new Date();
                         const bloqueada = await cliente.query("SELECT 1 FROM faturas_cartao WHERE cartao_id = $1 AND ano = $2 AND mes = $3 AND status <> 'aberta'", [cartaoId, hoje.getFullYear(), hoje.getMonth() + 1]);
                         if (bloqueada.rowCount) { await cliente.query("ROLLBACK"); return res.status(400).json({ mensagem: "A fatura atual deste cartão já foi fechada." }); }
@@ -1261,76 +1387,65 @@ app.delete(
     "/lista/:id",
     autenticar,
     async (req, res) => {
-        const { id } = req.params;
-
-        const itemId = Number(id);
-
-        if (
-            !Number.isInteger(itemId) ||
-            itemId <= 0
-        ) {
-            return res.status(400).json({
-                mensagem:
-                    "ID do item inválido.",
-            });
+        const itemId = Number(req.params.id);
+        if (!Number.isInteger(itemId) || itemId <= 0) {
+            return res.status(400).json({ mensagem: "ID do item inválido." });
         }
 
+        const client = await pool.connect();
         try {
-            const itemResult =
-                await pool.query(
-                    `SELECT usuario_id
-                     FROM listas
-                     WHERE id = $1`,
-                    [itemId]
+            await client.query("BEGIN");
+
+            const itemResult = await client.query(
+                "SELECT * FROM listas WHERE id = $1 FOR UPDATE",
+                [itemId]
+            );
+            if (!itemResult.rowCount) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ mensagem: "Item não encontrado." });
+            }
+            const item = itemResult.rows[0];
+            if (Number(item.usuario_id) !== req.usuarioId) {
+                await client.query("ROLLBACK");
+                return res.status(403).json({ mensagem: "Você não pode excluir este item." });
+            }
+
+            if (item.movimentacao_id) {
+                const movimentacao = await client.query(
+                    `SELECT id, usuario_id, forma_pagamento, cartao_id, data
+                     FROM movimentacoes WHERE id = $1 FOR UPDATE`,
+                    [item.movimentacao_id]
                 );
-
-            if (
-                itemResult.rowCount === 0
-            ) {
-                return res.status(404).json({
-                    mensagem:
-                        "Item não encontrado.",
-                });
+                const vinculada = movimentacao.rows[0];
+                if (vinculada && vinculada.forma_pagamento === "credito" && vinculada.cartao_id) {
+                    const faturaProtegida = await client.query(
+                        `SELECT 1 FROM faturas_cartao
+                         WHERE cartao_id = $1
+                           AND ano = EXTRACT(YEAR FROM $2::date)
+                           AND mes = EXTRACT(MONTH FROM $2::date)
+                           AND status <> 'aberta'`,
+                        [vinculada.cartao_id, vinculada.data]
+                    );
+                    if (faturaProtegida.rowCount) {
+                        await client.query("ROLLBACK");
+                        return res.status(409).json({
+                            mensagem: "Este item pertence a uma fatura fechada ou paga e não pode ser excluído.",
+                        });
+                    }
+                }
             }
 
-            if (
-                Number(
-                    itemResult
-                        .rows[0]
-                        .usuario_id
-                ) !==
-                req.usuarioId
-            ) {
-                return res.status(403).json({
-                    mensagem:
-                        "Você não pode excluir este item.",
-                });
-            }
-
-            const result =
-                await pool.query(
-                    `DELETE FROM listas
-                     WHERE id = $1
-                     RETURNING *`,
-                    [itemId]
+            const result = await client.query("DELETE FROM listas WHERE id = $1 RETURNING *", [itemId]);
+            if (item.movimentacao_id) {
+                await client.query(
+                    "DELETE FROM movimentacoes WHERE id = $1 AND usuario_id = $2",
+                    [item.movimentacao_id, req.usuarioId]
                 );
-
-            if (
-                result.rowCount === 0
-            ) {
-                return res.status(404).json({
-                    mensagem:
-                        "Item não encontrado.",
-                });
             }
-
-            return res.json({
-                mensagem:
-                    "Item removido com sucesso.",
-                item:
-                    result.rows[0],
-            });
+            await client.query("COMMIT");
+            return res.json({ mensagem: "Item e lançamento financeiro removidos com sucesso.", item: result.rows[0] });
         } catch (err) {
+            await client.query("ROLLBACK").catch(() => undefined);
             console.error(
                 "Erro ao excluir item:",
                 err
@@ -1340,7 +1455,7 @@ app.delete(
                 mensagem:
                     "Erro ao excluir item.",
             });
-        }
+        } finally { client.release(); }
     }
 );
 
@@ -1384,9 +1499,22 @@ app.get("/dashboard", autenticar, async (req, res) => {
                 [req.usuarioId, ano, mes]
             ),
             pool.query(
-                `SELECT * FROM cartoes
-                 WHERE usuario_id = $1
-                 ORDER BY created_at DESC, id DESC`,
+                `SELECT c.*,
+                        COALESCE((
+                            SELECT SUM(m.valor) FROM movimentacoes m
+                            WHERE m.usuario_id = c.usuario_id AND m.cartao_id = c.id
+                              AND m.tipo = 'despesa' AND m.forma_pagamento = 'credito'
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM faturas_cartao f
+                                  WHERE f.cartao_id = m.cartao_id AND f.usuario_id = m.usuario_id
+                                    AND f.ano = EXTRACT(YEAR FROM m.data)::integer
+                                    AND f.mes = EXTRACT(MONTH FROM m.data)::integer
+                                    AND f.status = 'paga'
+                              )
+                        ), 0)::numeric(12,2) AS limite_utilizado
+                 FROM cartoes c
+                 WHERE c.usuario_id = $1
+                 ORDER BY c.created_at DESC, c.id DESC`,
                 [req.usuarioId]
             ),
         ]);
@@ -1498,11 +1626,15 @@ app.post(
             ].includes(tipo) ||
             typeof descricao !== "string" ||
             !descricao.trim() ||
+            descricao.trim().length > 255 ||
             typeof categoria !== "string" ||
             !categoria.trim() ||
+            categoria.trim().length > 80 ||
             typeof valor !== "number" ||
             !Number.isFinite(valor) ||
-            valor <= 0
+            valor <= 0 ||
+            valor > VALOR_MONETARIO_MAXIMO ||
+            (data !== undefined && data !== null && data !== "" && !dataIsoValida(data))
         ) {
             return res.status(400).json({
                 mensagem:
@@ -1528,9 +1660,13 @@ app.post(
             await client.query("BEGIN");
             let cartaoNome = null;
             if (cartaoId) {
-                const cartao = await client.query("SELECT nome FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
-                if (!cartao.rowCount) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
-                cartaoNome = cartao.rows[0].nome;
+                const cartao = await buscarCartaoComUso(client, req.usuarioId, cartaoId, { bloquear: true });
+                if (!cartao) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Cartão inválido." }); }
+                if (!possuiLimite(cartao, valor)) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ mensagem: "Limite de crédito insuficiente neste cartão." });
+                }
+                cartaoNome = cartao.nome;
             }
             const dataBase = data ? new Date(`${data}T12:00:00Z`) : new Date();
             if (Number.isNaN(dataBase.getTime())) { await client.query("ROLLBACK"); return res.status(400).json({ mensagem: "Data inválida." }); }
@@ -1677,7 +1813,8 @@ app.put(
 
         if (
             typeof descricao !== "string" ||
-            !descricao.trim()
+            !descricao.trim() ||
+            descricao.trim().length > 255
         ) {
             return res.status(400).json({
                 mensagem:
@@ -1687,7 +1824,8 @@ app.put(
 
         if (
             typeof categoria !== "string" ||
-            !categoria.trim()
+            !categoria.trim() ||
+            categoria.trim().length > 80
         ) {
             return res.status(400).json({
                 mensagem:
@@ -1698,7 +1836,8 @@ app.put(
         if (
             typeof valor !== "number" ||
             !Number.isFinite(valor) ||
-            valor <= 0
+            valor <= 0 ||
+            valor > VALOR_MONETARIO_MAXIMO
         ) {
             return res.status(400).json({
                 mensagem:
@@ -1706,7 +1845,7 @@ app.put(
             });
         }
 
-        if (!data) {
+        if (!dataIsoValida(data)) {
             return res.status(400).json({
                 mensagem:
                     "Data da movimentação é obrigatória.",
@@ -1827,10 +1966,17 @@ app.put(
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
                 }
-                const cartao = await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [cartaoId, req.usuarioId]);
-                if (!cartao.rowCount) {
+                const cartao = await buscarCartaoComUso(client, req.usuarioId, cartaoId, {
+                    bloquear: true,
+                    ignorarMovimentacaoId: movimentacaoId,
+                });
+                if (!cartao) {
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Cartão inválido." });
+                }
+                if (!possuiLimite(cartao, valor)) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ mensagem: "Limite de crédito insuficiente neste cartão." });
                 }
                 const faturaDestino = await client.query(
                     `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
@@ -2168,8 +2314,8 @@ app.get("/orcamentos/:usuarioId", autenticar, async (req, res) => {
 app.put("/orcamentos", autenticar, async (req, res) => {
     const { categoria, valor, mes, ano } = req.body;
 
-    if (typeof categoria !== "string" || !categoria.trim() ||
-        typeof valor !== "number" || !Number.isFinite(valor) || valor <= 0 ||
+    if (typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80 ||
+        typeof valor !== "number" || !Number.isFinite(valor) || valor <= 0 || valor > VALOR_MONETARIO_MAXIMO ||
         !Number.isInteger(mes) || mes < 1 || mes > 12 ||
         !Number.isInteger(ano) || ano < 2000 || ano > 2200) {
         return res.status(400).json({ mensagem: "Dados do orçamento inválidos." });
@@ -2225,6 +2371,7 @@ app.delete("/orcamentos/:id", autenticar, async (req, res) => {
 app.put(
     "/alterar-senha",
     autenticar,
+    limitarTentativas({ limite: 6, janelaMs: 30 * 60 * 1000 }),
     async (req, res) => {
         const {
             senhaAtual,
@@ -2233,7 +2380,7 @@ app.put(
 
         if (
             typeof senhaAtual !== "string" ||
-            !senhaAtual ||
+            !senhaAtual || senhaAtual.length > 128 ||
             typeof novaSenha !== "string" ||
             !novaSenha
         ) {
@@ -2284,7 +2431,7 @@ app.put(
             if (
                 !senhaAtualValida
             ) {
-                return res.status(401).json({
+                return res.status(400).json({
                     mensagem:
                         "Senha atual incorreta.",
                 });
@@ -2306,6 +2453,8 @@ app.put(
                     req.usuarioId,
                 ]
             );
+
+            limparTentativas(req);
 
             return res.json({
                 mensagem:
