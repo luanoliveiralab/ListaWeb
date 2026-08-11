@@ -8,8 +8,8 @@ const router = express.Router();
 router.use(autenticar);
 
 const padroes = {
-    receita: ["Salário", "Freelance", "Investimentos", "Vendas", "Outros"],
-    despesa: ["Mercado", "Moradia", "Transporte", "Saúde", "Educação", "Lazer", "Padaria", "Carnes", "Bebidas", "Farmácia", "Limpeza", "Higiene", "Outros"],
+    receita: ["Salário", "Freelance", "Outros"],
+    despesa: ["Mercado", "Moradia", "Transporte"],
 };
 
 function validar(body) {
@@ -103,3 +103,4 @@ router.delete("/:id", asyncHandler(async (req, res) => {
 
 module.exports = router;
 module.exports.validarCategoria = validar;
+module.exports.categoriasPadrao = padroes;
