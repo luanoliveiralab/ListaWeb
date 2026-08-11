@@ -33,6 +33,9 @@ import type { Orcamento } from "@/types/Orcamento";
 import { orcamentosService } from "@/services/orcamentos.service";
 import { useBudgetThresholdAlerts } from "@/hooks/useBudgetThresholdAlerts";
 import type { Recorrencia } from "@/types/Planejamento";
+import AppSelect from "@/components/shared/AppSelect";
+import FinancialAgenda from "@/components/financas/FinancialAgenda";
+import { hojeEmSaoPaulo } from "@/lib/date";
 
 interface MovimentacaoProgramada {
     id: number;
@@ -46,6 +49,10 @@ interface MovimentacaoProgramada {
     cartao_id?: number | null;
     cartao_nome?: string | null;
     created_at: string;
+    status?: "pendente" | "realizada" | "falha";
+    erro?: string | null;
+    origem?: "programacao" | "recorrencia";
+    recorrencia_id?: number | null;
 }
 
 export default function FinancasPage() {
@@ -63,6 +70,7 @@ export default function FinancasPage() {
         useState<Movimentacao | null>(null);
 
     const [excluindoMovimentacao, setExcluindoMovimentacao] = useState(false);
+    const [escopoExclusao, setEscopoExclusao] = useState<"esta" | "proximas" | "todas">("esta");
 
     const [tipo, setTipo] = useState<"receita" | "despesa">("receita");
     const [descricao, setDescricao] = useState("");
@@ -72,7 +80,7 @@ export default function FinancasPage() {
     const [cartaoId, setCartaoId] = useState("");
     const [parcelas, setParcelas] = useState("1");
     const [data, setData] = useState(
-        new Date().toISOString().split("T")[0]
+        hojeEmSaoPaulo()
     );
 
     const {
@@ -157,6 +165,7 @@ export default function FinancasPage() {
         instituicao: string;
         limite_disponivel: number;
         dia_vencimento: number;
+        dia_fechamento?: number;
     }) {
         const temporario: Cartao = {
             id: -Date.now(),
@@ -232,7 +241,7 @@ export default function FinancasPage() {
         setFormaPagamento("saldo");
         setCartaoId("");
         setParcelas("1");
-        setData(new Date().toISOString().split("T")[0]);
+        setData(hojeEmSaoPaulo());
 
         try {
             const nova = await financasService.adicionar({
@@ -266,6 +275,7 @@ export default function FinancasPage() {
     // =========================
 
     function abrirModalExcluir(movimentacao: Movimentacao) {
+        setEscopoExclusao("esta");
         setMovimentacaoExcluir(movimentacao);
     }
 
@@ -278,22 +288,43 @@ export default function FinancasPage() {
                 queryClient.invalidateQueries({ queryKey: programadasKey });
                 mostrarAviso("Movimentação programada cancelada.");
             } else {
-                await excluirMovimentacao(movimentacaoExcluir.id);
+                await excluirMovimentacao(movimentacaoExcluir.id, movimentacaoExcluir.grupo_parcelamento ? escopoExclusao : "esta");
             }
             setMovimentacaoExcluir(null);
         }
         finally { setExcluindoMovimentacao(false); }
     }
 
-    async function excluirMovimentacao(id: number) {
-        const removida = movimentacoes.find((mov) => mov.id === id);
-        atualizarMovimentacoes((prev) => prev.filter((mov) => mov.id !== id));
+    async function editarCartao(id: number, dados: {
+        nome: string; instituicao: string; limite_disponivel: number; dia_vencimento: number; dia_fechamento?: number;
+    }) {
+        const anterior = cartoes.find((cartao) => cartao.id === id);
+        atualizarCartoes((atuais) => atuais.map((cartao) => cartao.id === id ? { ...cartao, ...dados } : cartao));
         try {
-            await financasService.remover(id);
+            const atualizado = await cartoesService.editar(id, dados);
+            atualizarCartoes((atuais) => atuais.map((cartao) => cartao.id === id ? atualizado : cartao));
             atualizarDashboard();
-            mostrarAviso("Movimentação excluída com sucesso!");
+            mostrarAviso("Cartão atualizado.");
+        } catch (error) {
+            if (anterior) atualizarCartoes((atuais) => atuais.map((cartao) => cartao.id === id ? anterior : cartao));
+            mostrarAviso(error instanceof Error ? error.message : "Não foi possível atualizar o cartão.", "erro");
+            throw error;
+        }
+    }
+
+    async function excluirMovimentacao(id: number, escopo: "esta" | "proximas" | "todas" = "esta") {
+        const removida = movimentacoes.find((mov) => mov.id === id);
+        if (escopo === "esta") atualizarMovimentacoes((prev) => prev.filter((mov) => mov.id !== id));
+        try {
+            await financasService.remover(id, escopo);
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: movimentacoesKey }),
+                queryClient.invalidateQueries({ queryKey: historicoKey }),
+            ]);
+            atualizarDashboard();
+            mostrarAviso(escopo === "esta" ? "Movimentação excluída com sucesso!" : "Parcelas selecionadas excluídas com sucesso!");
         } catch (err) {
-            if (removida) atualizarMovimentacoes((prev) => [removida, ...prev]);
+            if (escopo === "esta" && removida) atualizarMovimentacoes((prev) => [removida, ...prev]);
             console.error(err);
             mostrarAviso("Erro ao excluir movimentação.", "erro");
         }
@@ -303,6 +334,19 @@ export default function FinancasPage() {
     // EDITAR
     // =========================
     async function salvarEdicao(mov: Movimentacao) {
+        if (mov.programada_id) {
+            setModalAberto(false);
+            setMovimentacaoEditando(null);
+            try {
+                await financasService.editarProgramacao(mov.programada_id, {
+                    tipo: mov.tipo, descricao: mov.descricao, valor: Number(mov.valor), categoria: mov.categoria,
+                    data: mov.data, forma_pagamento: mov.forma_pagamento ?? "saldo", cartao_id: mov.cartao_id ?? null,
+                });
+                await queryClient.invalidateQueries({ queryKey: programadasKey });
+                mostrarAviso("Programação atualizada.");
+            } catch (error) { mostrarAviso(error instanceof Error ? error.message : "Não foi possível atualizar a programação.", "erro"); }
+            return;
+        }
         const anterior = movimentacoes.find((item) => item.id === mov.id);
         atualizarMovimentacoes((prev) => prev.map((item) => item.id === mov.id ? mov : item));
         setModalAberto(false);
@@ -316,6 +360,7 @@ export default function FinancasPage() {
                 data: mov.data,
                 forma_pagamento: mov.forma_pagamento ?? "saldo",
                 cartao_id: mov.cartao_id ?? null,
+                escopo_parcelamento: mov.escopo_parcelamento,
             });
 
             atualizarMovimentacoes((prev) =>
@@ -323,6 +368,12 @@ export default function FinancasPage() {
                     m.id === atualizada.id ? atualizada : m
                 )
             );
+            if (mov.grupo_parcelamento && mov.escopo_parcelamento !== "esta") {
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: movimentacoesKey }),
+                    queryClient.invalidateQueries({ queryKey: historicoKey }),
+                ]);
+            }
             atualizarDashboard();
 
             mostrarAviso("Movimentação atualizada com sucesso!");
@@ -336,6 +387,18 @@ export default function FinancasPage() {
     function editarMovimentacao(mov: Movimentacao) {
         setMovimentacaoEditando(mov);
         setModalAberto(true);
+    }
+
+    async function alternarConciliacao(movimentacao: Movimentacao) {
+        const conciliada = !movimentacao.conciliada;
+        atualizarMovimentacoes((atuais) => atuais.map((item) => item.id === movimentacao.id ? { ...item, conciliada } : item));
+        try {
+            await financasService.conciliar(movimentacao.id, conciliada);
+            mostrarAviso(conciliada ? "Movimentação marcada como conferida." : "Conferência removida.");
+        } catch (error) {
+            atualizarMovimentacoes((atuais) => atuais.map((item) => item.id === movimentacao.id ? movimentacao : item));
+            mostrarAviso(error instanceof Error ? error.message : "Não foi possível atualizar a conferência.", "erro");
+        }
     }
 
     if (!usuario) {
@@ -360,7 +423,7 @@ export default function FinancasPage() {
     const movimentacoesPendentes = programadas
         .filter((mov) => {
             const [anoMov, mesMov] = mov.data_programada.slice(0, 10).split("-").map(Number);
-            return mesMov === mes && anoMov === ano && mov.data_programada >= new Date().toISOString().slice(0, 10);
+            return mesMov === mes && anoMov === ano && mov.data_programada >= hojeEmSaoPaulo();
         })
         .map<Movimentacao>((mov) => ({
             id: -mov.id,
@@ -375,13 +438,19 @@ export default function FinancasPage() {
             cartao_id: mov.cartao_id,
             cartao_nome: mov.cartao_nome,
             pendente: true,
-            programada_id: mov.id,
+            programada_id: mov.origem === "programacao" ? mov.id : undefined,
+            recorrencia_pendente: mov.origem === "recorrencia",
+            recorrencia_id: mov.recorrencia_id,
+            falha_programacao: mov.status === "falha",
+            erro_programacao: mov.erro,
         }));
-    const hojeIso = new Date().toISOString().slice(0, 10);
+    const hojeIso = hojeEmSaoPaulo();
     const recorrenciasPendentes = recorrencias
         .filter((recorrencia) => {
             const dataOcorrencia = `${ano}-${String(mes).padStart(2, "0")}-${String(recorrencia.dia).padStart(2, "0")}`;
-            return recorrencia.ativa && dataOcorrencia >= hojeIso && !movimentacoes.some((mov) => mov.recorrencia_id === recorrencia.id);
+            return recorrencia.ativa && dataOcorrencia >= hojeIso
+                && !movimentacoes.some((mov) => mov.recorrencia_id === recorrencia.id)
+                && !programadas.some((item) => item.recorrencia_id === recorrencia.id && item.status === "falha");
         })
         .map<Movimentacao>((recorrencia) => ({
             id: -1_000_000_000 - recorrencia.id,
@@ -421,6 +490,10 @@ export default function FinancasPage() {
         .filter((mov) => mov.data.slice(0, 10) < inicioPeriodo)
         .reduce((total, mov) => total + (mov.tipo === "receita" ? Number(mov.valor) : (mov.forma_pagamento ?? "saldo") === "saldo" ? -Number(mov.valor) : 0), 0);
     const saldo = saldoAnterior + entradasNoSaldo - despesasNoSaldo;
+    const ajusteProjetado = [...movimentacoesPendentes, ...recorrenciasPendentes]
+        .filter((mov) => !mov.falha_programacao)
+        .reduce((total, mov) => total + (mov.tipo === "receita" ? Number(mov.valor) : (mov.forma_pagamento ?? "saldo") === "saldo" ? -Number(mov.valor) : 0), 0);
+    const saldoProjetado = saldo + ajusteProjetado;
 
     const dataMesAnterior = new Date(ano, mes - 2, 1);
     const mesAnterior = dataMesAnterior.getMonth() + 1;
@@ -444,6 +517,7 @@ export default function FinancasPage() {
         >
             <FinanceCards
                 saldo={saldo}
+                saldoProjetado={saldoProjetado}
                 receitas={receitas}
                 despesas={despesas}
                 anterior={{
@@ -476,6 +550,7 @@ export default function FinancasPage() {
                 carregando={carregandoCartoes}
                 movimentacoes={movimentacoesFiltradas}
                 onAdicionar={adicionarCartao}
+                onEditar={editarCartao}
                 onRemover={removerCartao}
             />
 
@@ -510,12 +585,22 @@ export default function FinancasPage() {
                 }}
             />
 
+            <FinancialAgenda movimentacoes={movimentacoesDaLista} />
+
             <FinanceTable
                 movimentacoes={movimentacoesDaLista}
                 loading={loading}
                 categoriaSelecionada={categoriaSelecionada}
                 onCategoriaChange={setCategoriaSelecionada}
                 onEditar={editarMovimentacao}
+                onConciliar={alternarConciliacao}
+                onImportada={async () => {
+                    await Promise.all([
+                        queryClient.invalidateQueries({ queryKey: movimentacoesKey }),
+                        queryClient.invalidateQueries({ queryKey: historicoKey }),
+                    ]);
+                    atualizarDashboard();
+                }}
                 onExcluir={(id) => {
                     const movimentacao = movimentacoesDaLista.find(
                         (mov) => mov.id === id
@@ -527,7 +612,7 @@ export default function FinancasPage() {
                 }}
             />
 
-            <ConfirmationDialog aberto={Boolean(movimentacaoExcluir)} titulo={movimentacaoExcluir?.pendente ? "Cancelar movimentação programada?" : "Excluir esta movimentação?"} descricao={movimentacaoExcluir?.pendente ? <>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> não será lançada.</> : <>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> será removida e deixará de participar do saldo e dos relatórios.</>} confirmar={movimentacaoExcluir?.pendente ? "Sim, cancelar programação" : "Sim, excluir movimentação"} processando={excluindoMovimentacao} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoMovimentacao} onAlterar={(aberto) => { if (!aberto) setMovimentacaoExcluir(null); }} />
+            <ConfirmationDialog aberto={Boolean(movimentacaoExcluir)} titulo={movimentacaoExcluir?.pendente ? "Cancelar movimentação programada?" : "Excluir esta movimentação?"} descricao={movimentacaoExcluir?.pendente ? <>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> não será lançada.</> : <div className="space-y-3"><p>A movimentação <strong>{movimentacaoExcluir?.descricao}</strong> será removida e deixará de participar do saldo e dos relatórios.</p>{movimentacaoExcluir?.grupo_parcelamento && <div className="text-left"><label className="mb-1 block text-xs font-medium text-foreground">Excluir do parcelamento</label><AppSelect value={escopoExclusao} onValueChange={(value) => setEscopoExclusao(value as "esta" | "proximas" | "todas")} options={[{ value: "esta", label: "Somente esta parcela" }, { value: "proximas", label: "Esta e as próximas" }, { value: "todas", label: "Todas as parcelas" }]} /></div>}</div>} confirmar={movimentacaoExcluir?.pendente ? "Sim, cancelar programação" : escopoExclusao === "esta" ? "Sim, excluir movimentação" : "Sim, excluir parcelas"} processando={excluindoMovimentacao} textoProcessando="Excluindo..." onConfirmar={confirmarExclusaoMovimentacao} onAlterar={(aberto) => { if (!aberto) setMovimentacaoExcluir(null); }} />
 
             <EditMovimentacaoModal
                 key={movimentacaoEditando?.id ?? "fechado"}

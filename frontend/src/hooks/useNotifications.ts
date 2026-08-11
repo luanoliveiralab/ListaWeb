@@ -7,10 +7,12 @@ import type { Movimentacao } from "@/types/Movimentacao";
 import type { Meta, Recorrencia } from "@/types/Planejamento";
 import type { Orcamento } from "@/types/Orcamento";
 import type { Cartao, FaturaCartao } from "@/types/Cartao";
+import { hojeEmSaoPaulo, ultimoDiaDoMes } from "@/lib/date";
 
 export type TipoAvisoApp = "orcamento" | "cartao" | "meta" | "recorrencia" | "tendencia";
 export interface AvisoApp { id: string; titulo: string; detalhe: string; tipo: TipoAvisoApp; href: string; importante: boolean; lido: boolean; }
-interface DadosAvisos { movs: Movimentacao[]; metas: Meta[]; recorrencias: Recorrencia[]; orcamentos: Orcamento[]; cartoes: Cartao[]; faturas: Array<FaturaCartao & { cartao_id: number; cartao_nome: string }>; }
+interface FalhaProgramacao { id: number; descricao: string; erro?: string | null; status?: string; origem?: string; tipo?: "receita" | "despesa"; valor?: number; data_programada?: string; forma_pagamento?: "saldo" | "credito"; }
+interface DadosAvisos { movs: Movimentacao[]; metas: Meta[]; recorrencias: Recorrencia[]; orcamentos: Orcamento[]; cartoes: Cartao[]; faturas: Array<FaturaCartao & { cartao_id: number; cartao_nome: string }>; programadas: FalhaProgramacao[]; }
 
 const eventoLeitura = "listaweb:avisos-lidos";
 const chaveLeitura = (usuarioId: number) => `avisos-lidos:${usuarioId}`;
@@ -22,18 +24,29 @@ const lerLidos = (usuarioId?: number) => {
 
 async function carregarAvisos(usuarioId: number): Promise<DadosAvisos> {
   const hoje = new Date(); const mes = hoje.getMonth() + 1; const ano = hoje.getFullYear();
-  const [movs, metas, recorrencias, orcamentos, cartoes] = await Promise.all([
-    api.get(`/financas/${usuarioId}`), api.get("/metas"), api.get("/recorrencias"), api.get(`/orcamentos/${usuarioId}?mes=${mes}&ano=${ano}`), api.get("/cartoes"),
-  ]) as [Movimentacao[], Meta[], Recorrencia[], Orcamento[], Cartao[]];
+  const [movs, metas, recorrencias, orcamentos, cartoes, programadas] = await Promise.all([
+    api.get(`/financas/${usuarioId}`), api.get("/metas"), api.get("/recorrencias"), api.get(`/orcamentos/${usuarioId}?mes=${mes}&ano=${ano}`), api.get("/cartoes"), api.get("/financas/programadas"),
+  ]) as [Movimentacao[], Meta[], Recorrencia[], Orcamento[], Cartao[], FalhaProgramacao[]];
   const faturas = (await Promise.all(cartoes.map(async (cartao) => ((await api.get(`/cartoes/${cartao.id}/faturas`)) as FaturaCartao[]).map((fatura) => ({ ...fatura, cartao_id: cartao.id, cartao_nome: cartao.nome }))))).flat();
-  return { movs, metas, recorrencias, orcamentos, cartoes, faturas };
+  return { movs, metas, recorrencias, orcamentos, cartoes, faturas, programadas };
 }
 
 function calcularAvisos(dados: DadosAvisos): Omit<AvisoApp, "lido">[] {
-  const lista: Omit<AvisoApp, "lido">[] = []; const hoje = new Date(); const dia = hoje.getDate(); const mes = hoje.getMonth(); const ano = hoje.getFullYear();
+  const lista: Omit<AvisoApp, "lido">[] = []; const hojeIso = hojeEmSaoPaulo(); const [ano, mesNumero, dia] = hojeIso.split("-").map(Number); const mes = mesNumero - 1; const hoje = new Date(`${hojeIso}T12:00:00`);
   const atuais = dados.movs.filter((m) => { const d = new Date(`${m.data.slice(0, 10)}T12:00:00`); return d.getMonth() === mes && d.getFullYear() === ano; });
   for (const o of dados.orcamentos) { const gasto = atuais.filter((m) => m.tipo === "despesa" && m.impacta_resultado !== false && m.categoria === o.categoria).reduce((t, m) => t + Number(m.valor), 0); const p = gasto / Number(o.valor); if (p >= .5) lista.push({ id: `o-${o.id}-${ano}-${mes + 1}`, titulo: p >= 1 ? "Orçamento atingido" : p >= .8 ? "Orçamento próximo do limite" : "Orçamento em atenção", detalhe: `${o.categoria}: ${Math.round(p * 100)}% utilizado`, tipo: "orcamento", href: "/planejamento", importante: p >= .8 }); }
   dados.recorrencias.filter((r) => r.ativa && r.dia >= dia && r.dia <= dia + 3).forEach((r) => lista.push({ id: `r-${r.id}-${ano}-${mes + 1}`, titulo: "Lançamento recorrente próximo", detalhe: `${r.descricao} está previsto para o dia ${r.dia}`, tipo: "recorrencia", href: "/planejamento", importante: false }));
+  dados.programadas.filter((item) => item.status === "falha").forEach((item) => lista.push({ id: `pf-${item.origem}-${item.id}`, titulo: "Lançamento não realizado", detalhe: `${item.descricao}: ${item.erro || "verifique os dados da programação"}`, tipo: "recorrencia", href: "/financas", importante: true }));
+  const saldoAtual = dados.movs.reduce((total, movimento) => total + (movimento.tipo === "receita" ? Number(movimento.valor) : (movimento.forma_pagamento ?? "saldo") === "saldo" ? -Number(movimento.valor) : 0), 0);
+  const ultimoDiaMes = ultimoDiaDoMes(ano, mes + 1);
+  const ajusteProgramado = dados.programadas
+    .filter((item) => item.status !== "falha" && item.data_programada && item.data_programada >= hojeIso && item.data_programada <= ultimoDiaMes && item.forma_pagamento !== "credito")
+    .reduce((total, item) => total + (item.tipo === "receita" ? Number(item.valor) : -Number(item.valor)), 0);
+  const ajusteRecorrente = dados.recorrencias
+    .filter((item) => item.ativa && item.dia >= dia && (item.forma_pagamento ?? "saldo") !== "credito")
+    .reduce((total, item) => total + (item.tipo === "receita" ? Number(item.valor) : -Number(item.valor)), 0);
+  const saldoProjetado = saldoAtual + ajusteProgramado + ajusteRecorrente;
+  if (saldoProjetado < 0) lista.push({ id: `sp-${ano}-${mes + 1}`, titulo: "Saldo projetado negativo", detalhe: `Os compromissos previstos podem levar seu saldo a ${saldoProjetado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} neste mês`, tipo: "tendencia", href: "/financas", importante: true });
   dados.metas.filter((m) => m.concluida).forEach((m) => lista.push({ id: `m-${m.id}`, titulo: "Meta concluída", detalhe: `Você alcançou “${m.nome}”`, tipo: "meta", href: "/planejamento", importante: false }));
   for (const c of dados.cartoes) { const fatura = atuais.filter((m) => m.tipo === "despesa" && m.forma_pagamento === "credito" && Number(m.cartao_id) === c.id).reduce((t, m) => t + Number(m.valor), 0); const utilizado = Number(c.limite_utilizado ?? fatura); const p = Number(c.limite_disponivel) > 0 ? utilizado / Number(c.limite_disponivel) : 0; if (p >= .8) lista.push({ id: `c-${c.id}-${ano}-${mes + 1}`, titulo: p >= 1 ? "Limite do cartão atingido" : "Limite do cartão próximo do fim", detalhe: `${c.nome}: ${Math.round(p * 100)}% utilizado`, tipo: "cartao", href: "/financas", importante: true }); }
   for (const f of dados.faturas.filter((item) => item.status === "fechada")) { const dias = Math.ceil((new Date(f.vencimento).getTime() - hoje.getTime()) / 86_400_000); if (dias <= 5) lista.push({ id: `f-${f.cartao_id}-${f.ano}-${f.mes}`, titulo: dias < 0 ? "Fatura vencida" : "Fatura próxima do vencimento", detalhe: `${f.cartao_nome}: ${Number(f.total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}${dias >= 0 ? ` vence em ${dias} dia${dias === 1 ? "" : "s"}` : " está em atraso"}`, tipo: "cartao", href: "/financas", importante: true }); }
@@ -49,7 +62,7 @@ export function useNotifications(usuarioId?: number, habilitado = true) {
     const sincronizar = () => setLidos(lerLidos(usuarioId));
     sincronizar(); window.addEventListener(eventoLeitura, sincronizar); return () => window.removeEventListener(eventoLeitura, sincronizar);
   }, [usuarioId]);
-  const avisos = useMemo(() => calcularAvisos(query.data ?? { movs: [], metas: [], recorrencias: [], orcamentos: [], cartoes: [], faturas: [] }).map((aviso) => ({ ...aviso, lido: lidos.includes(aviso.id) })), [lidos, query.data]);
+  const avisos = useMemo(() => calcularAvisos(query.data ?? { movs: [], metas: [], recorrencias: [], orcamentos: [], cartoes: [], faturas: [], programadas: [] }).map((aviso) => ({ ...aviso, lido: lidos.includes(aviso.id) })), [lidos, query.data]);
   const salvarLidos = useCallback((ids: string[]) => { if (!usuarioId) return; const unicos = [...new Set(ids)].slice(-500); localStorage.setItem(chaveLeitura(usuarioId), JSON.stringify(unicos)); setLidos(unicos); window.dispatchEvent(new Event(eventoLeitura)); }, [usuarioId]);
   const marcarComoLido = useCallback((id: string) => salvarLidos([...lidos, id]), [lidos, salvarLidos]);
   const marcarTodosComoLidos = useCallback(() => salvarLidos([...lidos, ...avisos.map((a) => a.id)]), [avisos, lidos, salvarLidos]);

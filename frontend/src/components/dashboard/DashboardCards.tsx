@@ -11,6 +11,7 @@ interface DashboardCardsProps {
   comprados: number;
   pendentes: number;
   saldo: number;
+  saldoProjetado: number;
   receitas: number;
   despesas: number;
   movimentacoes: number;
@@ -41,7 +42,7 @@ const siglaInstituicao = (instituicao: string) => siglas[instituicao] ?? institu
   .split(/\s+/).map((parte) => parte[0]).join("").slice(0, 5).toUpperCase();
 
 export default function DashboardCards({
-  total, comprados, pendentes, saldo, receitas, despesas, movimentacoes,
+  total, comprados, pendentes, saldo, saldoProjetado, receitas, despesas, movimentacoes,
   cartoes, movimentacoesDoPeriodo,
 }: DashboardCardsProps) {
   const [indiceCartao, setIndiceCartao] = useState(0);
@@ -75,12 +76,13 @@ export default function DashboardCards({
 
   const cards = [
     { titulo: "Saldo em conta", valor: moeda(saldo), detalhe: "Entradas menos despesas no saldo", Icone: Wallet, cor: saldo >= 0 ? "text-emerald-600" : "text-rose-600", fundo: saldo >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10" },
+    { titulo: "Saldo projetado", valor: moeda(saldoProjetado), detalhe: "Inclui lançamentos futuros", Icone: Wallet, cor: saldoProjetado >= 0 ? "text-violet-600" : "text-rose-600", fundo: saldoProjetado >= 0 ? "bg-violet-500/10" : "bg-rose-500/10" },
     { titulo: "Entradas do mês", valor: moeda(receitas), detalhe: `${quantidadeReceitas} ${quantidadeReceitas === 1 ? "lançamento" : "lançamentos"} de receita`, Icone: ArrowUpRight, cor: "text-emerald-600", fundo: "bg-emerald-500/10" },
     { titulo: "Despesas do mês", valor: moeda(despesas), detalhe: despesasCredito > 0 ? `${moeda(despesasCredito)} no crédito` : "Nenhuma despesa no crédito", Icone: ArrowDownRight, cor: "text-rose-600", fundo: "bg-rose-500/10" },
   ];
 
   return (
-    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {cards.map(({ titulo, valor, detalhe, Icone, cor, fundo }, index) => (
         <article key={titulo} className="surface-interactive metric-enter p-5" style={{ animationDelay: `${index * 35}ms` }}>
           <div className="flex items-start justify-between gap-4">
@@ -114,7 +116,7 @@ export default function DashboardCards({
         </div>
       </article>
 
-      <article className="surface-interactive metric-enter p-5 sm:col-span-2 xl:col-span-4">
+      <article className="surface-interactive metric-enter p-5 sm:col-span-2 xl:col-span-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Lista do período</p>

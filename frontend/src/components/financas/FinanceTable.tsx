@@ -9,15 +9,19 @@ import {
     Printer,
     Search,
     Trash2,
+    CircleCheckBig,
 } from "lucide-react";
 
 import type { Movimentacao } from "@/types/Movimentacao";
+import ImportTransactionsButton from "@/components/financas/ImportTransactionsButton";
 
 interface Props {
     movimentacoes: Movimentacao[];
     loading: boolean;
     onEditar: (movimentacao: Movimentacao) => void;
     onExcluir: (id: number) => void;
+    onConciliar: (movimentacao: Movimentacao) => void;
+    onImportada: () => void | Promise<void>;
     categoriaSelecionada?: string;
     onCategoriaChange?: (categoria: string) => void;
 }
@@ -35,10 +39,13 @@ export default function FinanceTable({
     loading,
     onEditar,
     onExcluir,
+    onConciliar,
+    onImportada,
     categoriaSelecionada = "",
 }: Props) {
     const [pesquisa, setPesquisa] = useState("");
     const [filtro, setFiltro] = useState<Filtro>("todas");
+    const [quantidadeVisivel, setQuantidadeVisivel] = useState(30);
 
     const movimentacoesVisiveis = useMemo(() => {
         const termo = pesquisa.trim().toLocaleLowerCase("pt-BR");
@@ -89,8 +96,10 @@ export default function FinanceTable({
     const quantidadeDespesas = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado !== false && movimentacao.tipo === "despesa").length;
     const quantidadeTransferencias = movimentacoes.filter((movimentacao) => movimentacao.impacta_resultado === false).length;
     const realizadas = movimentacoesVisiveis.filter((movimentacao) => !movimentacao.pendente);
-    const pendentes = movimentacoesVisiveis.filter((movimentacao) => movimentacao.pendente);
-    const movimentacoesAgrupadas = [...realizadas, ...pendentes];
+    const pendentes = movimentacoesVisiveis.filter((movimentacao) => movimentacao.pendente && !movimentacao.falha_programacao);
+    const falhas = movimentacoesVisiveis.filter((movimentacao) => movimentacao.falha_programacao);
+    const movimentacoesAgrupadas = [...realizadas, ...pendentes, ...falhas];
+    const movimentacoesRenderizadas = movimentacoesAgrupadas.slice(0, quantidadeVisivel);
 
     if (loading) {
         return (
@@ -133,7 +142,7 @@ export default function FinanceTable({
                         <input
                             type="search"
                             value={pesquisa}
-                            onChange={(event) => setPesquisa(event.target.value)}
+                            onChange={(event) => { setPesquisa(event.target.value); setQuantidadeVisivel(30); }}
                             placeholder="Buscar descrição ou categoria"
                             className="control pl-10"
                             aria-label="Buscar movimentações"
@@ -151,7 +160,7 @@ export default function FinanceTable({
                         <button
                             key={valor}
                             type="button"
-                            onClick={() => setFiltro(valor)}
+                            onClick={() => { setFiltro(valor); setQuantidadeVisivel(30); }}
                             aria-pressed={filtro === valor}
                             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                                 filtro === valor
@@ -166,6 +175,7 @@ export default function FinanceTable({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+                    <ImportTransactionsButton onImportada={onImportada} />
                     <button type="button" onClick={imprimirRelatorio} disabled={movimentacoesVisiveis.length === 0} className="button-secondary">
                         <Printer size={17} /> Salvar em PDF
                     </button>
@@ -182,14 +192,15 @@ export default function FinanceTable({
                 </div>
             ) : (
                 <div className="divide-y divide-border">
-                    {movimentacoesAgrupadas.map((movimentacao, index) => {
+                    {movimentacoesRenderizadas.map((movimentacao, index) => {
                         const receita = movimentacao.tipo === "receita";
                         const transferencia = movimentacao.impacta_resultado === false;
 
                         return (
                             <div key={movimentacao.id}>
                             {index === 0 && !movimentacao.pendente && <div className="bg-muted/40 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:px-6">Realizadas</div>}
-                            {movimentacao.pendente && index === realizadas.length && <div className="flex items-center justify-between bg-amber-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 sm:px-6"><span>Pendentes / futuras</span><span className="normal-case tracking-normal">Ainda não afetam o saldo</span></div>}
+                            {movimentacao.pendente && !movimentacao.falha_programacao && index === realizadas.length && <div className="flex items-center justify-between bg-amber-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 sm:px-6"><span>Pendentes / futuras</span><span className="normal-case tracking-normal">Ainda não afetam o saldo</span></div>}
+                            {movimentacao.falha_programacao && index === realizadas.length + pendentes.length && <div className="flex items-center justify-between bg-rose-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300 sm:px-6"><span>Precisam de atenção</span><span className="normal-case tracking-normal">Não foram lançadas</span></div>}
                             <article
                                 key={movimentacao.id}
                                 className="transaction-row group"
@@ -224,7 +235,8 @@ export default function FinanceTable({
                                                     {movimentacao.categoria}
                                                 </span>
                                                 {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
-                                                {movimentacao.pendente && <span className="rounded-full bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-300">{movimentacao.recorrencia_pendente ? "Recorrência" : "Programada"}</span>}
+                                                {movimentacao.pendente && <span className={`rounded-full px-2.5 py-1 font-medium ${movimentacao.falha_programacao ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{movimentacao.falha_programacao ? "Falhou" : movimentacao.recorrencia_pendente ? "Recorrência" : "Programada"}</span>}
+                                                {!movimentacao.pendente && movimentacao.conciliada && <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-700 dark:text-emerald-300">Conferida</span>}
                                                 {movimentacao.tipo === "despesa" && (
                                                     <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
                                                         {movimentacao.forma_pagamento === "credito"
@@ -235,6 +247,7 @@ export default function FinanceTable({
                                                 <time dateTime={movimentacao.data}>
                                                     {new Date(`${movimentacao.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
                                                 </time>
+                                                {movimentacao.erro_programacao && <span className="font-medium text-rose-600 dark:text-rose-300">{movimentacao.erro_programacao}</span>}
                                             </div>
                                         </div>
 
@@ -249,7 +262,8 @@ export default function FinanceTable({
                                 </div>
 
                                 {!transferencia && !movimentacao.recorrencia_pendente && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                                    {!movimentacao.pendente && <button
+                                    {!movimentacao.pendente && <button type="button" onClick={() => onConciliar(movimentacao)} className={`icon-button ${movimentacao.conciliada ? "text-emerald-600" : ""}`} aria-label={`${movimentacao.conciliada ? "Desmarcar conferência de" : "Marcar como conferida"} ${movimentacao.descricao}`} title={movimentacao.conciliada ? "Desmarcar conferência" : "Marcar como conferida"}><CircleCheckBig size={17} /></button>}
+                                    {(!movimentacao.pendente || Boolean(movimentacao.programada_id)) && <button
                                         type="button"
                                         onClick={() => onEditar(movimentacao)}
                                         className="icon-button"
@@ -270,6 +284,7 @@ export default function FinanceTable({
                             </div>
                         );
                     })}
+                    {quantidadeVisivel < movimentacoesAgrupadas.length && <div className="flex justify-center p-4"><button type="button" className="button-secondary" onClick={() => setQuantidadeVisivel((atual) => atual + 30)}>Mostrar mais {Math.min(30, movimentacoesAgrupadas.length - quantidadeVisivel)}</button></div>}
                 </div>
             )}
         </section>

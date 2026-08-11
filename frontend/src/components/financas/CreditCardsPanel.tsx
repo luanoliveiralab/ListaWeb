@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, CreditCard, Plus, ReceiptText, Trash2, Wifi, X } from "lucide-react";
+import { Building2, CreditCard, Pencil, Plus, ReceiptText, Trash2, Wifi, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Cartao } from "@/types/Cartao";
@@ -22,7 +22,9 @@ interface Props {
     instituicao: string;
     limite_disponivel: number;
     dia_vencimento: number;
+    dia_fechamento?: number;
   }) => Promise<void>;
+  onEditar: (id: number, dados: { nome: string; instituicao: string; limite_disponivel: number; dia_vencimento: number; dia_fechamento?: number }) => Promise<void>;
   onRemover: (id: number) => Promise<void>;
 }
 
@@ -48,7 +50,7 @@ const estilos: Record<string, { fundo: string; sigla: string }> = {
 const padrao = { fundo: "from-slate-600 via-slate-700 to-slate-900", sigla: "CARD" };
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, onAdicionar, onRemover }: Props) {
+export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, onAdicionar, onEditar, onRemover }: Props) {
   const queryClient = useQueryClient();
   const { mostrarAviso } = useToast();
   const [nome, setNome] = useState("");
@@ -56,9 +58,11 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   const [outraInstituicao, setOutraInstituicao] = useState("");
   const [limite, setLimite] = useState("");
   const [vencimento, setVencimento] = useState("");
+  const [fechamento, setFechamento] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [removendo, setRemovendo] = useState<number | null>(null);
   const [formularioAberto, setFormularioAberto] = useState(false);
+  const [cartaoEditando, setCartaoEditando] = useState<Cartao | null>(null);
   const [cartaoFaturas, setCartaoFaturas] = useState<Cartao | null>(null);
   const [faturaSelecionada, setFaturaSelecionada] = useState<FaturaCartao | null>(null);
   const [alterandoFatura, setAlterandoFatura] = useState(false);
@@ -105,8 +109,11 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
 
     setSalvando(true);
     try {
-      await onAdicionar({ nome: nome.trim(), instituicao: instituicaoFinal, limite_disponivel: valor, dia_vencimento: dia });
-      setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento("");
+      const dados = { nome: nome.trim(), instituicao: instituicaoFinal, limite_disponivel: valor, dia_vencimento: dia, dia_fechamento: Number(fechamento || Math.max(1, dia - 7)) };
+      if (cartaoEditando) await onEditar(cartaoEditando.id, dados);
+      else await onAdicionar(dados);
+      setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento(""); setFechamento("");
+      setCartaoEditando(null);
       setFormularioAberto(false);
     } catch {
       // O componente pai exibe a mensagem adequada sem limpar o formulário.
@@ -128,8 +135,21 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
   }
 
   function cancelarCadastro() {
-    setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento("");
+    setNome(""); setInstituicao(""); setOutraInstituicao(""); setLimite(""); setVencimento(""); setFechamento("");
+    setCartaoEditando(null);
     setFormularioAberto(false);
+  }
+
+  function abrirEdicao(cartao: Cartao) {
+    const instituicaoConhecida = instituicoes.includes(cartao.instituicao);
+    setCartaoEditando(cartao);
+    setNome(cartao.nome);
+    setInstituicao(instituicaoConhecida ? cartao.instituicao : "Outra instituição");
+    setOutraInstituicao(instituicaoConhecida ? "" : cartao.instituicao);
+    setLimite(String(cartao.limite_disponivel));
+    setFechamento(String(cartao.dia_fechamento ?? Math.max(1, cartao.dia_vencimento - 7)));
+    setVencimento(String(cartao.dia_vencimento));
+    setFormularioAberto(true);
   }
 
   return (
@@ -151,8 +171,9 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           )}
         </div>
 
-        {formularioAberto && cartoes.length < 4 && (
+        {formularioAberto && (cartoes.length < 4 || Boolean(cartaoEditando)) && (
         <form onSubmit={salvar} className="mt-5 grid animate-in gap-3 border-t border-border pt-5 fade-in slide-in-from-top-2 duration-300 md:grid-cols-2 xl:grid-cols-[1.1fr_1.1fr_1fr_.75fr_auto]">
+          {cartaoEditando && <p className="md:col-span-2 xl:col-span-5 text-sm font-semibold">Editando {cartaoEditando.nome}</p>}
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-nome">Nome do cartão</label>
             <input id="cartao-nome" className="control" maxLength={80} placeholder="Ex.: Cartão principal" value={nome} onChange={(e) => setNome(e.target.value)} required />
@@ -164,6 +185,10 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-limite">Limite disponível</label>
             <input id="cartao-limite" className="control" inputMode="decimal" placeholder="R$ 0,00" value={limite} onChange={(e) => setLimite(e.target.value)} required />
+          </div>
+          <div className="field-group">
+            <label className="field-label" htmlFor="cartao-fechamento">Fechamento</label>
+            <AppSelect id="cartao-fechamento" value={fechamento} onValueChange={setFechamento} placeholder="Selecione o dia" options={Array.from({ length: 31 }, (_, index) => ({ value: String(index + 1), label: `Dia ${index + 1}` }))} required />
           </div>
           <div className="field-group">
             <label className="field-label" htmlFor="cartao-vencimento">Vencimento</label>
@@ -178,7 +203,7 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
           <div className="expandable-form-actions md:col-span-2 xl:col-span-5">
             <button type="button" onClick={cancelarCadastro} disabled={salvando} className="button-secondary">Cancelar</button>
             <button className="button-primary" disabled={salvando || !nome || !instituicaoFinal || !limite || !vencimento}>
-              <Plus size={17} /> {salvando ? "Salvando" : "Adicionar cartão"}
+              {cartaoEditando ? <Pencil size={17} /> : <Plus size={17} />} {salvando ? "Salvando" : cartaoEditando ? "Salvar alterações" : "Adicionar cartão"}
             </button>
           </div>
         </form>
@@ -196,9 +221,10 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
         <div className="flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto overscroll-x-contain p-5 pr-[18vw] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:w-full sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:p-6 sm:pr-6 xl:grid-cols-[repeat(4,minmax(0,1fr))] xl:px-7">
           {cartoes.map((cartao) => {
             const estilo = estilos[cartao.instituicao] ?? { ...padrao, sigla: cartao.instituicao };
-            const fatura = movimentacoes
+            const faturaDoPeriodo = movimentacoes
               .filter((mov) => mov.tipo === "despesa" && mov.forma_pagamento === "credito" && Number(mov.cartao_id) === cartao.id)
               .reduce((total, mov) => total + Number(mov.valor), 0);
+            const fatura = cartao.fatura_atual === undefined ? faturaDoPeriodo : Number(cartao.fatura_atual);
             const limite = Number(cartao.limite_disponivel);
             const utilizado = cartao.limite_utilizado === undefined ? fatura : Number(cartao.limite_utilizado);
             const disponivel = Math.max(limite - utilizado, 0);
@@ -210,14 +236,14 @@ export default function CreditCardsPanel({ cartoes, carregando, movimentacoes, o
                 <div className="relative flex h-full flex-col justify-between">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-xs text-white/70">{cartao.nome}</p><p className="mt-1 max-w-40 truncate text-lg font-bold">{estilo.sigla}</p></div>
-                    <div className="flex gap-1"><button type="button" onClick={() => { setCartaoFaturas(cartao); setFaturaSelecionada(null); }} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Ver faturas de ${cartao.nome}`}><ReceiptText size={16} /></button><button type="button" onClick={() => setConfirmacao({ tipo: "cartao", cartao })} disabled={removendo === cartao.id} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Excluir ${cartao.nome}`}><Trash2 size={16} /></button></div>
+                    <div className="flex gap-1"><button type="button" onClick={() => { setCartaoFaturas(cartao); setFaturaSelecionada(null); }} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Ver faturas de ${cartao.nome}`}><ReceiptText size={16} /></button><button type="button" onClick={() => abrirEdicao(cartao)} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Editar ${cartao.nome}`}><Pencil size={16} /></button><button type="button" onClick={() => setConfirmacao({ tipo: "cartao", cartao })} disabled={removendo === cartao.id} className="rounded-lg p-2 text-white/70 transition hover:bg-white/15 hover:text-white" aria-label={`Excluir ${cartao.nome}`}><Trash2 size={16} /></button></div>
                   </div>
                   <div className="flex items-center gap-3"><span className="h-8 w-10 rounded-md bg-gradient-to-br from-yellow-200 to-amber-400 shadow-inner" /><Wifi className="rotate-90 text-white/80" size={20} /></div>
                   <div>
                     <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-white/80 transition-[width]" style={{ width: `${uso}%` }} /></div>
                     <div className="flex items-end justify-between gap-3">
                       <div><p className="text-[10px] uppercase tracking-widest text-white/65">Fatura atual</p><p className="mt-0.5 text-lg font-semibold">{moeda.format(fatura)}</p><p className="text-[10px] text-white/70">{moeda.format(disponivel)} disponível</p></div>
-                      <div className="text-right"><p className="text-[10px] uppercase tracking-widest text-white/65">Vence</p><p className="font-semibold">Dia {cartao.dia_vencimento}</p></div>
+                      <div className="text-right"><p className="text-[10px] uppercase tracking-widest text-white/65">Fecha / vence</p><p className="font-semibold">{cartao.dia_fechamento ?? Math.max(1, cartao.dia_vencimento - 7)} / {cartao.dia_vencimento}</p></div>
                     </div>
                   </div>
                 </div>

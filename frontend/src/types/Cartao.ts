@@ -5,7 +5,9 @@ export interface Cartao {
   instituicao: string;
   limite_disponivel: number | string;
   limite_utilizado?: number | string;
+  fatura_atual?: number | string;
   dia_vencimento: number;
+  dia_fechamento?: number;
   created_at: string;
 }
 

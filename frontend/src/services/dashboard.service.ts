@@ -8,6 +8,7 @@ export interface DashboardData {
   movimentacoes: Movimentacao[];
   cartoes: Cartao[];
   saldo_anterior: number;
+  ajuste_projetado: number;
 }
 
 export const dashboardService = {

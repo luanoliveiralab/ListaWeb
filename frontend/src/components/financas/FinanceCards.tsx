@@ -9,6 +9,7 @@ import {
 
 interface Props {
   saldo: number;
+  saldoProjetado: number;
   receitas: number;
   despesas: number;
   anterior: {
@@ -26,15 +27,16 @@ function variacao(atual: number, anterior: number) {
   return ((atual - anterior) / Math.abs(anterior)) * 100;
 }
 
-export default function FinanceCards({ saldo, receitas, despesas, anterior }: Props) {
+export default function FinanceCards({ saldo, saldoProjetado, receitas, despesas, anterior }: Props) {
   const cards = [
     { titulo: "Saldo", valor: saldo, anterior: anterior.saldo, Icone: Wallet, cor: saldo >= 0 ? "text-blue-600" : "text-rose-600", fundo: saldo >= 0 ? "bg-blue-500/10" : "bg-rose-500/10", positivoQuandoSobe: true },
+    { titulo: "Saldo projetado", valor: saldoProjetado, anterior: saldo, Icone: TrendingUp, cor: saldoProjetado >= 0 ? "text-violet-600" : "text-rose-600", fundo: saldoProjetado >= 0 ? "bg-violet-500/10" : "bg-rose-500/10", positivoQuandoSobe: true },
     { titulo: "Receitas", valor: receitas, anterior: anterior.receitas, Icone: ArrowUpRight, cor: "text-emerald-600", fundo: "bg-emerald-500/10", positivoQuandoSobe: true },
     { titulo: "Despesas", valor: despesas, anterior: anterior.despesas, Icone: ArrowDownRight, cor: "text-rose-600", fundo: "bg-rose-500/10", positivoQuandoSobe: false },
   ];
 
   return (
-    <section className="grid gap-4 md:grid-cols-3">
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card, index) => {
         const percentual = variacao(card.valor, card.anterior);
         const subiu = percentual !== null && percentual > 0;

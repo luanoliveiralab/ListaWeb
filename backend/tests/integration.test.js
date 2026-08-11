@@ -1,6 +1,7 @@
 require("dotenv").config();
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const jwt = require("jsonwebtoken");
 const app = require("../server");
 const { pool } = require("../src/db");
 
@@ -42,6 +43,27 @@ test("rota privada rejeita acesso sem sessão", async () => {
 test("categorias globais ficam isoladas por sessão", async () => {
     const response = await fetch(`${baseUrl}/categorias`);
     assert.equal(response.status, 401);
+});
+
+test("cartões e status bancário carregam com o novo ciclo de fatura", async (contexto) => {
+    const usuario = await pool.query("SELECT id, token_version FROM usuarios ORDER BY id LIMIT 1");
+    if (!usuario.rowCount) return contexto.skip("Banco de teste sem usuário cadastrado.");
+    const token = jwt.sign({ id: usuario.rows[0].id, v: usuario.rows[0].token_version }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "5m" });
+    const headers = { authorization: `Bearer ${token}` };
+    const [cartoes, integracao] = await Promise.all([
+        fetch(`${baseUrl}/cartoes`, { headers }),
+        fetch(`${baseUrl}/integracoes/bancarias/status`, { headers }),
+    ]);
+    assert.equal(cartoes.status, 200);
+    const dadosCartoes = await cartoes.json();
+    assert.ok(Array.isArray(dadosCartoes));
+    if (dadosCartoes.length) {
+        const faturas = await fetch(`${baseUrl}/cartoes/${dadosCartoes[0].id}/faturas`, { headers });
+        assert.equal(faturas.status, 200);
+        assert.ok(Array.isArray(await faturas.json()));
+    }
+    assert.equal(integracao.status, 200);
+    assert.deepEqual((await integracao.json()).importacoes_disponiveis, ["ofx", "csv"]);
 });
 
 test("login não revela se o e-mail existe", async () => {

@@ -93,6 +93,7 @@ export default function Dashboard() {
     .filter((mov) => mov.tipo === "receita")
     .reduce((acc, mov) => acc + Number(mov.valor), 0);
   const saldo = Number(data?.saldo_anterior ?? 0) + entradasNoSaldo - despesasNoSaldo;
+  const saldoProjetado = saldo + Number(data?.ajuste_projetado ?? 0);
 
   const quantidadeMovimentacoes =
     movimentacoesFiltradas.length;
@@ -124,6 +125,7 @@ export default function Dashboard() {
         comprados={itensComprados}
         pendentes={itensPendentes}
         saldo={saldo}
+        saldoProjetado={saldoProjetado}
         receitas={receitas}
         despesas={despesas}
         movimentacoes={quantidadeMovimentacoes}

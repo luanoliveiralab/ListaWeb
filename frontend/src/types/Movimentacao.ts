@@ -28,4 +28,12 @@ export interface Movimentacao {
     programada_id?: number;
     recorrencia_id?: number | null;
     recorrencia_pendente?: boolean;
+    falha_programacao?: boolean;
+    erro_programacao?: string | null;
+    escopo_parcelamento?: "esta" | "proximas" | "todas";
+    conciliada?: boolean;
+    conciliada_em?: string | null;
+    origem_importacao?: "csv" | "ofx" | null;
+    fatura_ano?: number | null;
+    fatura_mes?: number | null;
 }

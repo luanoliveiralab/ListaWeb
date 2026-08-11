@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { Cartao } from "@/types/Cartao";
+import { hojeEmSaoPaulo } from "@/lib/date";
 import { useCategorias } from "@/hooks/useCategorias";
 import AppSelect from "@/components/shared/AppSelect";
 
@@ -48,7 +49,7 @@ export default function AddMovimentacaoForm({
 
   function cancelar() {
     setTipo("receita"); setDescricao(""); setValor(""); setCategoria("");
-    setData(new Date().toISOString().split("T")[0]);
+    setData(hojeEmSaoPaulo());
     setFormaPagamento("saldo"); setCartaoId(""); setParcelas("1"); setFormularioAberto(false);
   }
 
@@ -73,7 +74,7 @@ export default function AddMovimentacaoForm({
 
             <div><label className="field-label">Valor (R$)</label><input type="text" inputMode="decimal" placeholder="R$ 0,00" value={valor} onChange={(event) => setValor(event.target.value)} className="control mt-2" /></div>
             <div><label className="field-label">Categoria</label><AppSelect value={categoria} onValueChange={setCategoria} className="mt-2" placeholder="Selecionar categoria" options={categorias.map((item) => ({ value: item.nome, label: item.nome }))} /></div>
-            <div><label className="field-label">Data</label><input type="date" value={data} onChange={(event) => setData(event.target.value)} className="control mt-2 [color-scheme:light] dark:[color-scheme:dark]" /></div>
+            <div><label className="field-label">Data</label><input type="date" max={hojeEmSaoPaulo()} value={data} onChange={(event) => setData(event.target.value)} className="control mt-2 [color-scheme:light] dark:[color-scheme:dark]" /><p className="mt-1 text-xs text-muted-foreground">Para datas futuras, use Programar movimentação.</p></div>
           </div>
 
           <div className="expandable-form-actions mt-6">

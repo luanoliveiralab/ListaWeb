@@ -19,6 +19,9 @@ const categoriasRouter = require("./src/routes/categorias");
 const { criarContextoRequisicao, rotaNaoEncontrada, tratarErro } = require("./src/http");
 const { frontendUrlPrincipal, validarFotoDataUrl } = require("./src/validation");
 const { buscarCartaoComUso, possuiLimite } = require("./src/credit");
+const { iniciarMotorDeAgendamentos } = require("./src/scheduler");
+const { interpretarArquivoFinanceiro } = require("./src/financial-import");
+const { obterStatusIntegracaoBancaria } = require("./src/banking");
 
 const app = express();
 const VALOR_MONETARIO_MAXIMO = 9_999_999_999.99;
@@ -27,6 +30,9 @@ function dataIsoValida(valor) {
     if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
     const data = new Date(`${valor}T12:00:00Z`);
     return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
+}
+function hojeSaoPaulo() {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
@@ -1494,7 +1500,7 @@ app.get("/dashboard", autenticar, async (req, res) => {
     }
 
     try {
-        const [lista, movimentacoes, cartoes, saldoAnterior] = await Promise.all([
+        const [lista, movimentacoes, cartoes, saldoAnterior, ajusteProjetado] = await Promise.all([
             pool.query(
                 `SELECT
                     id, nome, quantidade, categoria, valor,
@@ -1546,6 +1552,25 @@ app.get("/dashboard", autenticar, async (req, res) => {
                  WHERE usuario_id = $1 AND data < make_date($2, $3, 1)`,
                 [req.usuarioId, ano, mes]
             ),
+            pool.query(
+                `WITH previstas AS (
+                    SELECT tipo, valor, forma_pagamento
+                    FROM movimentacoes_programadas
+                    WHERE usuario_id = $1 AND lancada_em IS NULL AND status = 'pendente'
+                      AND data_programada >= GREATEST(make_date($2,$3,1), (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date)
+                      AND data_programada < make_date($2,$3,1) + INTERVAL '1 month'
+                    UNION ALL
+                    SELECT r.tipo, r.valor, r.forma_pagamento
+                    FROM recorrencias r
+                    WHERE r.usuario_id = $1 AND r.ativa = TRUE
+                      AND make_date($2,$3,r.dia) >= GREATEST(r.inicio, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date)
+                      AND (r.fim IS NULL OR make_date($2,$3,r.dia) <= r.fim)
+                      AND NOT EXISTS (SELECT 1 FROM movimentacoes m WHERE m.recorrencia_id = r.id AND m.data = make_date($2,$3,r.dia))
+                )
+                SELECT COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor WHEN tipo = 'despesa' AND forma_pagamento = 'saldo' THEN -valor ELSE 0 END),0)::numeric(12,2) AS valor
+                FROM previstas`,
+                [req.usuarioId, ano, mes]
+            ),
         ]);
 
         return res.json({
@@ -1553,6 +1578,7 @@ app.get("/dashboard", autenticar, async (req, res) => {
             movimentacoes: movimentacoes.rows,
             cartoes: cartoes.rows,
             saldo_anterior: saldoAnterior.rows[0].saldo,
+            ajuste_projetado: ajusteProjetado.rows[0].valor,
         });
     } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
@@ -1569,11 +1595,23 @@ app.get("/dashboard", autenticar, async (req, res) => {
 app.get("/financas/programadas", autenticar, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT p.*, c.nome AS cartao_nome
+            `SELECT p.id, p.usuario_id, p.tipo, p.descricao, p.valor, p.categoria,
+                    p.data_programada, p.forma_pagamento, p.cartao_id, c.nome AS cartao_nome,
+                    p.status, p.erro, p.created_at, NULL::integer AS recorrencia_id, 'programacao' AS origem
              FROM movimentacoes_programadas p
              LEFT JOIN cartoes c ON c.id = p.cartao_id
-             WHERE p.usuario_id = $1 AND p.lancada_em IS NULL AND p.data_programada >= CURRENT_DATE
-             ORDER BY p.data_programada ASC, p.id ASC`,
+             WHERE p.usuario_id = $1 AND p.lancada_em IS NULL
+               AND p.data_programada >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+             UNION ALL
+             SELECT e.id, e.usuario_id, r.tipo, r.descricao, r.valor, r.categoria,
+                    e.data_programada, r.forma_pagamento, r.cartao_id, c.nome AS cartao_nome,
+                    e.status, e.erro, e.created_at, r.id AS recorrencia_id, 'recorrencia' AS origem
+             FROM recorrencia_execucoes e
+             JOIN recorrencias r ON r.id = e.recorrencia_id
+             LEFT JOIN cartoes c ON c.id = r.cartao_id
+             WHERE e.usuario_id = $1 AND e.status = 'falha'
+               AND e.data_programada = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date
+             ORDER BY data_programada ASC, id ASC`,
             [req.usuarioId]
         );
         return res.json(result.rows);
@@ -1581,6 +1619,49 @@ app.get("/financas/programadas", autenticar, async (req, res) => {
         console.error("Erro ao buscar movimentações programadas:", err);
         return res.status(500).json({ mensagem: "Erro ao buscar movimentações programadas." });
     }
+});
+
+app.post("/financas/importar", autenticar, async (req, res) => {
+    try {
+        const formato = String(req.body.formato || "").toLowerCase();
+        const registros = interpretarArquivoFinanceiro(formato, req.body.conteudo)
+            .filter((registro) => registro.data <= hojeSaoPaulo());
+        if (!registros.length) return res.status(400).json({ mensagem: "O arquivo não possui movimentações realizadas até hoje." });
+        const result = await pool.query(
+            `WITH dados AS (
+                SELECT * FROM jsonb_to_recordset($1::jsonb) AS item(
+                    tipo varchar, descricao varchar, valor numeric, data date, referencia_externa varchar
+                )
+             )
+             INSERT INTO movimentacoes
+                (usuario_id, tipo, descricao, valor, categoria, data, forma_pagamento,
+                 conciliada, conciliada_em, origem_importacao, referencia_externa)
+             SELECT $2, tipo, LEFT(descricao, 255), valor, 'Importado', data, 'saldo',
+                    TRUE, NOW(), $3, referencia_externa
+             FROM dados
+             WHERE valor > 0 AND valor <= $4
+             ON CONFLICT (usuario_id, origem_importacao, referencia_externa)
+                WHERE origem_importacao IS NOT NULL AND referencia_externa IS NOT NULL
+             DO NOTHING
+             RETURNING *`,
+            [JSON.stringify(registros), req.usuarioId, formato, VALOR_MONETARIO_MAXIMO]
+        );
+        return res.status(201).json({
+            movimentacoes: result.rows,
+            importadas: result.rowCount,
+            ignoradas: registros.length - result.rowCount,
+        });
+    } catch (error) {
+        if (error instanceof Error && /arquivo|csv|ofx|colunas|movimentaç|formato/i.test(error.message)) {
+            return res.status(400).json({ mensagem: error.message });
+        }
+        console.error("Erro ao importar movimentações:", error);
+        return res.status(500).json({ mensagem: "Não foi possível importar as movimentações." });
+    }
+});
+
+app.get("/integracoes/bancarias/status", autenticar, (req, res) => {
+    return res.json(obterStatusIntegracaoBancaria());
 });
 
 app.get(
@@ -1681,7 +1762,7 @@ app.post(
             !Number.isFinite(valor) ||
             valor <= 0 ||
             valor > VALOR_MONETARIO_MAXIMO ||
-            (data !== undefined && data !== null && data !== "" && !dataIsoValida(data))
+            (data !== undefined && data !== null && data !== "" && (!dataIsoValida(data) || data > hojeSaoPaulo()))
         ) {
             return res.status(400).json({
                 mensagem:
@@ -1816,7 +1897,7 @@ app.post("/financas/programar", autenticar, async (req, res) => {
         typeof descricao !== "string" || !descricao.trim() || descricao.trim().length > 255 ||
         typeof categoria !== "string" || !categoria.trim() || categoria.trim().length > 80 ||
         typeof valor !== "number" || !Number.isFinite(valor) || valor <= 0 || valor > VALOR_MONETARIO_MAXIMO ||
-        !dataIsoValida(data) || data < new Date().toISOString().slice(0, 10) ||
+        !dataIsoValida(data) || data < hojeSaoPaulo() ||
         (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento))
     ) {
         return res.status(400).json({ mensagem: "Dados da movimentação programada inválidos." });
@@ -1863,6 +1944,40 @@ app.delete("/financas/programar/:id", autenticar, async (req, res) => {
     }
 });
 
+app.put("/financas/programar/:id", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    const { tipo, descricao, valor, categoria, data, forma_pagamento, cartao_id } = req.body;
+    if (!Number.isInteger(id) || id <= 0 || !["receita", "despesa"].includes(tipo) || typeof descricao !== "string" || !descricao.trim() || typeof categoria !== "string" || !categoria.trim() || typeof valor !== "number" || !Number.isFinite(valor) || valor <= 0 || !dataIsoValida(data) || data < hojeSaoPaulo()) return res.status(400).json({ mensagem: "Dados da programação inválidos." });
+    const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
+    const cartaoId = formaPagamento === "credito" ? Number(cartao_id) : null;
+    if (formaPagamento === "credito" && (!Number.isInteger(cartaoId) || cartaoId <= 0)) return res.status(400).json({ mensagem: "Selecione um cartão válido." });
+    const result = await pool.query(
+        `UPDATE movimentacoes_programadas SET tipo=$1, descricao=$2, valor=$3, categoria=$4, data_programada=$5,
+                forma_pagamento=$6, cartao_id=$7, status='pendente', erro=NULL, ultima_tentativa_em=NULL
+         WHERE id=$8 AND usuario_id=$9 AND lancada_em IS NULL RETURNING *`,
+        [tipo, descricao.trim(), valor, categoria.trim(), data, formaPagamento, cartaoId, id, req.usuarioId]
+    );
+    if (!result.rowCount) return res.status(404).json({ mensagem: "Programação não encontrada." });
+    return res.json(result.rows[0]);
+});
+
+app.put("/financas/:id/conciliar", autenticar, async (req, res) => {
+    const id = Number(req.params.id);
+    const { conciliada } = req.body;
+    if (!Number.isInteger(id) || id <= 0 || typeof conciliada !== "boolean") {
+        return res.status(400).json({ mensagem: "Dados de conciliação inválidos." });
+    }
+    const result = await pool.query(
+        `UPDATE movimentacoes
+         SET conciliada = $1, conciliada_em = CASE WHEN $1 THEN NOW() ELSE NULL END
+         WHERE id = $2 AND usuario_id = $3
+         RETURNING *`,
+        [conciliada, id, req.usuarioId]
+    );
+    if (!result.rowCount) return res.status(404).json({ mensagem: "Movimentação não encontrada." });
+    return res.json(result.rows[0]);
+});
+
 app.put(
     "/financas/:id",
     autenticar,
@@ -1893,7 +2008,12 @@ app.put(
             quantidade,
             forma_pagamento,
             cartao_id,
+            escopo_parcelamento = "esta",
         } = req.body;
+
+        if (!["esta", "proximas", "todas"].includes(escopo_parcelamento)) {
+            return res.status(400).json({ mensagem: "Escopo de parcelamento inválido." });
+        }
 
         // =================================================
         // VALIDAÇÕES
@@ -1951,6 +2071,9 @@ app.put(
                 mensagem:
                     "Data da movimentação é obrigatória.",
             });
+        }
+        if (data > hojeSaoPaulo()) {
+            return res.status(400).json({ mensagem: "Use Programar movimentação para datas futuras." });
         }
 
         if (forma_pagamento !== undefined && !["saldo", "credito"].includes(forma_pagamento)) {
@@ -2018,6 +2141,22 @@ app.put(
             const movimentacao =
                 movimentacaoResult.rows[0];
 
+            const escopoParcelamento = movimentacao.grupo_parcelamento
+                ? escopo_parcelamento
+                : "esta";
+            const parcelasAlvoResult = movimentacao.grupo_parcelamento && escopoParcelamento !== "esta"
+                ? await client.query(
+                    `SELECT * FROM movimentacoes
+                     WHERE usuario_id = $1 AND grupo_parcelamento = $2
+                       AND ($3 = 'todas' OR parcela_atual >= $4)
+                     ORDER BY parcela_atual
+                     FOR UPDATE`,
+                    [req.usuarioId, movimentacao.grupo_parcelamento, escopoParcelamento, movimentacao.parcela_atual]
+                )
+                : { rows: [movimentacao] };
+            const parcelasAlvo = parcelasAlvoResult.rows;
+            const parcelasAlvoIds = parcelasAlvo.map((parcela) => Number(parcela.id));
+
             // =================================================
             // SEGURANÇA
             // =================================================
@@ -2046,18 +2185,20 @@ app.put(
                 await client.query("ROLLBACK");
                 return res.status(409).json({ mensagem: "Transferências de metas devem ser alteradas em Planejamento." });
             }
-            if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
-                await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);
-                const faturaProtegida = await client.query(
-                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
-                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
-                     AND status <> 'aberta'`,
-                    [movimentacao.cartao_id, movimentacao.data]
-                );
-                if (faturaProtegida.rowCount) {
-                    await client.query("ROLLBACK");
-                    return res.status(409).json({ mensagem: "Movimentações de uma fatura fechada ou paga não podem ser alteradas." });
-                }
+            const faturaProtegida = await client.query(
+                `SELECT 1
+                 FROM movimentacoes m
+                 JOIN faturas_cartao f ON f.cartao_id = m.cartao_id
+                    AND f.ano = COALESCE(m.fatura_ano, EXTRACT(YEAR FROM m.data)::integer)
+                    AND f.mes = COALESCE(m.fatura_mes, EXTRACT(MONTH FROM m.data)::integer)
+                 WHERE m.id = ANY($1::integer[]) AND m.forma_pagamento = 'credito'
+                   AND f.status <> 'aberta'
+                 LIMIT 1`,
+                [parcelasAlvoIds]
+            );
+            if (faturaProtegida.rowCount) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "Parcelas de uma fatura fechada ou paga não podem ser alteradas." });
             }
 
             const formaPagamento = tipo === "despesa" && forma_pagamento === "credito" ? "credito" : "saldo";
@@ -2067,27 +2208,49 @@ app.put(
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Selecione um cartão para a despesa no crédito." });
                 }
-                const cartao = await buscarCartaoComUso(client, req.usuarioId, cartaoId, {
-                    bloquear: true,
-                    ignorarMovimentacaoId: movimentacaoId,
-                });
+                const cartao = await buscarCartaoComUso(client, req.usuarioId, cartaoId, { bloquear: true });
                 if (!cartao) {
                     await client.query("ROLLBACK");
                     return res.status(400).json({ mensagem: "Cartão inválido." });
                 }
-                if (!possuiLimite(cartao, valor)) {
+                const creditoAtualNoCartao = parcelasAlvo.reduce((total, parcela) => (
+                    parcela.tipo === "despesa" &&
+                    parcela.forma_pagamento === "credito" &&
+                    Number(parcela.cartao_id) === cartaoId
+                        ? total + Number(parcela.valor)
+                        : total
+                ), 0);
+                const novoCreditoTotal = valor * parcelasAlvo.length;
+                const limiteDisponivelComEstorno = Number(cartao.limite_disponivel) - Number(cartao.limite_utilizado) + creditoAtualNoCartao;
+                if (novoCreditoTotal > limiteDisponivelComEstorno + 0.00001) {
                     await client.query("ROLLBACK");
                     return res.status(409).json({ mensagem: "Limite de crédito insuficiente neste cartão." });
                 }
-                const faturaDestino = await client.query(
-                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
-                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
-                     AND status <> 'aberta'`,
-                    [cartaoId, data]
-                );
-                if (faturaDestino.rowCount) {
-                    await client.query("ROLLBACK");
-                    return res.status(409).json({ mensagem: "A fatura selecionada já foi fechada ou paga." });
+
+                const periodosDestino = new Set();
+                for (const parcela of parcelasAlvo) {
+                    const dataParcela = Number(parcela.id) === movimentacaoId
+                        ? data
+                        : String(parcela.data).slice(0, 10);
+                    const [anoParcela, mesParcela, diaParcela] = dataParcela.split("-").map(Number);
+                    const periodo = new Date(Date.UTC(
+                        anoParcela,
+                        mesParcela - 1 + (diaParcela > Number(cartao.dia_fechamento) ? 1 : 0),
+                        1
+                    ));
+                    periodosDestino.add(`${periodo.getUTCFullYear()}-${periodo.getUTCMonth() + 1}`);
+                }
+                for (const periodo of periodosDestino) {
+                    const [anoFatura, mesFatura] = periodo.split("-").map(Number);
+                    const faturaDestino = await client.query(
+                        `SELECT 1 FROM faturas_cartao
+                         WHERE cartao_id = $1 AND ano = $2 AND mes = $3 AND status <> 'aberta'`,
+                        [cartaoId, anoFatura, mesFatura]
+                    );
+                    if (faturaDestino.rowCount) {
+                        await client.query("ROLLBACK");
+                        return res.status(409).json({ mensagem: "Uma das parcelas pertence a uma fatura já fechada ou paga." });
+                    }
                 }
             }
 
@@ -2118,6 +2281,21 @@ app.put(
                         movimentacaoId,
                     ]
                 );
+
+            if (movimentacao.grupo_parcelamento && escopoParcelamento !== "esta") {
+                const descricaoBase = descricao.trim().replace(/ \(\d+\/\d+\)$/, "");
+                await client.query(
+                    `UPDATE movimentacoes
+                     SET tipo = $1,
+                         descricao = $2 || ' (' || parcela_atual || '/' || parcelas_total || ')',
+                         valor = $3,
+                         categoria = $4,
+                         forma_pagamento = $5,
+                         cartao_id = $6
+                     WHERE id = ANY($7::integer[]) AND id <> $8`,
+                    [tipo, descricaoBase, valor, categoria.trim(), formaPagamento, cartaoId, parcelasAlvoIds, movimentacaoId]
+                );
+            }
 
             if (
                 result.rowCount === 0
@@ -2228,6 +2406,7 @@ app.delete(
     autenticar,
     async (req, res) => {
         const { id } = req.params;
+        const escopoParcelamento = typeof req.query.escopo === "string" ? req.query.escopo : "esta";
 
         const movimentacaoId =
             Number(id);
@@ -2244,6 +2423,10 @@ app.delete(
             });
         }
 
+        if (!["esta", "proximas", "todas"].includes(escopoParcelamento)) {
+            return res.status(400).json({ mensagem: "Escopo de parcelamento inválido." });
+        }
+
         const client =
             await pool.connect();
 
@@ -2252,7 +2435,8 @@ app.delete(
 
             const movimentacaoResult =
                 await client.query(
-                    `SELECT usuario_id, forma_pagamento, cartao_id, data, fatura_pagamento_id, meta_movimentacao_id
+                    `SELECT usuario_id, forma_pagamento, cartao_id, data, fatura_ano, fatura_mes,
+                            fatura_pagamento_id, meta_movimentacao_id, grupo_parcelamento, parcela_atual
                      FROM movimentacoes
                      WHERE id = $1
                      FOR UPDATE`,
@@ -2292,26 +2476,40 @@ app.delete(
             }
 
             const movimentacao = movimentacaoResult.rows[0];
-            if (movimentacao.fatura_pagamento_id) {
+            const parcelasAlvoResult = movimentacao.grupo_parcelamento && escopoParcelamento !== "esta"
+                ? await client.query(
+                    `SELECT id, fatura_pagamento_id, meta_movimentacao_id
+                     FROM movimentacoes
+                     WHERE usuario_id = $1 AND grupo_parcelamento = $2
+                       AND ($3 = 'todas' OR parcela_atual >= $4)
+                     FOR UPDATE`,
+                    [req.usuarioId, movimentacao.grupo_parcelamento, escopoParcelamento, movimentacao.parcela_atual]
+                )
+                : { rows: [movimentacao] };
+            const parcelasAlvo = parcelasAlvoResult.rows;
+            const parcelasAlvoIds = parcelasAlvo.map((parcela) => Number(parcela.id ?? movimentacaoId));
+            if (parcelasAlvo.some((parcela) => parcela.fatura_pagamento_id)) {
                 await client.query("ROLLBACK");
                 return res.status(409).json({ mensagem: "O pagamento de uma fatura não pode ser excluído." });
             }
-            if (movimentacao.meta_movimentacao_id) {
+            if (parcelasAlvo.some((parcela) => parcela.meta_movimentacao_id)) {
                 await client.query("ROLLBACK");
                 return res.status(409).json({ mensagem: "Transferências de metas devem ser gerenciadas em Planejamento." });
             }
-            if (movimentacao.forma_pagamento === "credito" && movimentacao.cartao_id) {
-                await client.query("SELECT id FROM cartoes WHERE id = $1 AND usuario_id = $2 FOR UPDATE", [movimentacao.cartao_id, req.usuarioId]);
-                const faturaProtegida = await client.query(
-                    `SELECT 1 FROM faturas_cartao WHERE cartao_id = $1
-                     AND ano = EXTRACT(YEAR FROM $2::date) AND mes = EXTRACT(MONTH FROM $2::date)
-                     AND status <> 'aberta'`,
-                    [movimentacao.cartao_id, movimentacao.data]
-                );
-                if (faturaProtegida.rowCount) {
-                    await client.query("ROLLBACK");
-                    return res.status(409).json({ mensagem: "Movimentações de uma fatura fechada ou paga não podem ser excluídas." });
-                }
+            const faturaProtegida = await client.query(
+                `SELECT 1
+                 FROM movimentacoes m
+                 JOIN faturas_cartao f ON f.cartao_id = m.cartao_id
+                    AND f.ano = COALESCE(m.fatura_ano, EXTRACT(YEAR FROM m.data)::integer)
+                    AND f.mes = COALESCE(m.fatura_mes, EXTRACT(MONTH FROM m.data)::integer)
+                 WHERE m.id = ANY($1::integer[]) AND m.forma_pagamento = 'credito'
+                   AND f.status <> 'aberta'
+                 LIMIT 1`,
+                [parcelasAlvoIds]
+            );
+            if (faturaProtegida.rowCount) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ mensagem: "Parcelas de uma fatura fechada ou paga não podem ser excluídas." });
             }
 
             // =================================================
@@ -2321,8 +2519,8 @@ app.delete(
             await client.query(
                 `UPDATE listas
                  SET movimentacao_id = NULL
-                 WHERE movimentacao_id = $1`,
-                [movimentacaoId]
+                 WHERE movimentacao_id = ANY($1::integer[])`,
+                [parcelasAlvoIds]
             );
 
             // =================================================
@@ -2332,9 +2530,9 @@ app.delete(
             const result =
                 await client.query(
                     `DELETE FROM movimentacoes
-                     WHERE id = $1
+                     WHERE id = ANY($1::integer[])
                      RETURNING *`,
-                    [movimentacaoId]
+                    [parcelasAlvoIds]
                 );
 
             if (
@@ -2616,6 +2814,7 @@ async function iniciarServidor() {
         "utf8"
     );
     await pool.query(migracao);
+    iniciarMotorDeAgendamentos();
 
     app.listen(PORT, () => {
         console.log(`Backend rodando na porta ${PORT}`);

@@ -3,6 +3,7 @@ const { pool } = require("../db");
 const { autenticar } = require("../middleware/autenticar");
 const { idPositivo, periodoValido } = require("../http");
 const { buscarCartaoComUso, possuiLimite } = require("../credit");
+const { processarAgendamentosDoDia, DATA_LOCAL_SQL } = require("../scheduler");
 
 const router = express.Router();
 router.use(autenticar);
@@ -109,6 +110,9 @@ router.post("/gerar", async (req, res, next) => {
     try {
         ({ mes, ano } = periodoValido(req.body.mes ?? hoje.getMonth() + 1, req.body.ano ?? hoje.getFullYear()));
     } catch (error) { return next(error); }
+    let processamento;
+    try { processamento = await processarAgendamentosDoDia({ usuarioId: req.usuarioId }); }
+    catch (error) { return next(error); }
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -116,7 +120,7 @@ router.post("/gerar", async (req, res, next) => {
             `DELETE FROM movimentacoes
              WHERE usuario_id = $1
                AND recorrencia_id IS NOT NULL
-               AND data > CURRENT_DATE`,
+               AND data > ${DATA_LOCAL_SQL}`,
             [req.usuarioId]
         );
         const programadas = await client.query(
@@ -124,12 +128,16 @@ router.post("/gerar", async (req, res, next) => {
              FROM recorrencias WHERE usuario_id = $1 AND ativa = TRUE
                AND make_date($2, $3, dia) >= inicio
                AND (fim IS NULL OR make_date($2, $3, dia) <= fim)
-               AND make_date($2, $3, dia) = CURRENT_DATE
+               AND make_date($2, $3, dia) = ${DATA_LOCAL_SQL}
+               AND NOT EXISTS (
+                   SELECT 1 FROM recorrencia_execucoes e
+                   WHERE e.recorrencia_id = recorrencias.id AND e.data_programada = ${DATA_LOCAL_SQL}
+               )
              ORDER BY dia, id FOR UPDATE`,
             [req.usuarioId, ano, mes]
         );
-        let geradas = 0;
-        let ignoradasPorCredito = 0;
+        let geradas = processamento.geradas;
+        let ignoradasPorCredito = processamento.falhas;
         for (const recorrencia of programadas.rows) {
             if (recorrencia.tipo === "despesa" && recorrencia.forma_pagamento === "credito") {
                 const cartao = await buscarCartaoComUso(client, req.usuarioId, recorrencia.cartao_id, { bloquear: true });
@@ -149,7 +157,7 @@ router.post("/gerar", async (req, res, next) => {
         }
         const pendentes = await client.query(
             `SELECT * FROM movimentacoes_programadas
-             WHERE usuario_id = $1 AND lancada_em IS NULL AND data_programada = CURRENT_DATE
+             WHERE usuario_id = $1 AND lancada_em IS NULL AND status = 'pendente' AND data_programada = ${DATA_LOCAL_SQL}
              ORDER BY data_programada, id FOR UPDATE`,
             [req.usuarioId]
         );

@@ -136,6 +136,11 @@ CREATE TABLE IF NOT EXISTS cartoes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- O fechamento define em qual fatura uma compra entra; cartões antigos recebem um padrão seguro.
+ALTER TABLE cartoes ADD COLUMN IF NOT EXISTS dia_fechamento SMALLINT CHECK (dia_fechamento BETWEEN 1 AND 31);
+UPDATE cartoes SET dia_fechamento = GREATEST(1, dia_vencimento - 7) WHERE dia_fechamento IS NULL;
+ALTER TABLE cartoes ALTER COLUMN dia_fechamento SET NOT NULL;
+
 CREATE TABLE IF NOT EXISTS categorias (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -176,6 +181,42 @@ ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS forma_pagamento
 ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS cartao_id
     INTEGER REFERENCES cartoes(id) ON DELETE SET NULL;
 
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS fatura_ano INTEGER CHECK (fatura_ano IS NULL OR fatura_ano BETWEEN 2000 AND 2200);
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS fatura_mes SMALLINT CHECK (fatura_mes IS NULL OR fatura_mes BETWEEN 1 AND 12);
+UPDATE movimentacoes m
+SET fatura_ano = EXTRACT(YEAR FROM (date_trunc('month', m.data)::date
+        + CASE WHEN EXTRACT(DAY FROM m.data)::integer > c.dia_fechamento THEN INTERVAL '1 month' ELSE INTERVAL '0 month' END))::integer,
+    fatura_mes = EXTRACT(MONTH FROM (date_trunc('month', m.data)::date
+        + CASE WHEN EXTRACT(DAY FROM m.data)::integer > c.dia_fechamento THEN INTERVAL '1 month' ELSE INTERVAL '0 month' END))::integer
+FROM cartoes c
+WHERE m.cartao_id = c.id AND m.forma_pagamento = 'credito'
+  AND (m.fatura_ano IS NULL OR m.fatura_mes IS NULL);
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS conciliada BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS conciliada_em TIMESTAMPTZ;
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS origem_importacao VARCHAR(12);
+ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS referencia_externa VARCHAR(160);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_importacao_unica
+    ON movimentacoes(usuario_id, origem_importacao, referencia_externa)
+    WHERE origem_importacao IS NOT NULL AND referencia_externa IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION definir_periodo_fatura_movimentacao() RETURNS trigger AS $$
+DECLARE fechamento INTEGER; periodo DATE;
+BEGIN
+    IF NEW.forma_pagamento = 'credito' AND NEW.cartao_id IS NOT NULL THEN
+        SELECT dia_fechamento INTO fechamento FROM cartoes WHERE id = NEW.cartao_id;
+        periodo := date_trunc('month', NEW.data)::date;
+        IF EXTRACT(DAY FROM NEW.data)::integer > fechamento THEN periodo := (periodo + INTERVAL '1 month')::date; END IF;
+        NEW.fatura_ano := EXTRACT(YEAR FROM periodo)::integer;
+        NEW.fatura_mes := EXTRACT(MONTH FROM periodo)::integer;
+    ELSE NEW.fatura_ano := NULL; NEW.fatura_mes := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_definir_periodo_fatura ON movimentacoes;
+CREATE TRIGGER trg_definir_periodo_fatura BEFORE INSERT OR UPDATE OF data, forma_pagamento, cartao_id ON movimentacoes
+    FOR EACH ROW EXECUTE FUNCTION definir_periodo_fatura_movimentacao();
+
 ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS forma_pagamento
     VARCHAR(10) NOT NULL DEFAULT 'saldo' CHECK (forma_pagamento IN ('saldo', 'credito'));
 ALTER TABLE recorrencias ADD COLUMN IF NOT EXISTS cartao_id
@@ -194,6 +235,22 @@ CREATE TABLE IF NOT EXISTS movimentacoes_programadas (
     movimentacao_id INTEGER UNIQUE REFERENCES movimentacoes(id) ON DELETE SET NULL,
     lancada_em TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE movimentacoes_programadas ADD COLUMN IF NOT EXISTS status VARCHAR(12) NOT NULL DEFAULT 'pendente';
+ALTER TABLE movimentacoes_programadas ADD COLUMN IF NOT EXISTS erro TEXT;
+ALTER TABLE movimentacoes_programadas ADD COLUMN IF NOT EXISTS ultima_tentativa_em TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS recorrencia_execucoes (
+    id SERIAL PRIMARY KEY,
+    recorrencia_id INTEGER NOT NULL REFERENCES recorrencias(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    data_programada DATE NOT NULL,
+    status VARCHAR(12) NOT NULL DEFAULT 'pendente',
+    erro TEXT,
+    movimentacao_id INTEGER UNIQUE REFERENCES movimentacoes(id) ON DELETE SET NULL,
+    ultima_tentativa_em TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (recorrencia_id, data_programada)
 );
 
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
@@ -219,5 +276,7 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_programadas_pendentes
     ON movimentacoes_programadas(usuario_id, data_programada)
     WHERE lancada_em IS NULL;
+CREATE INDEX IF NOT EXISTS idx_recorrencia_execucoes_usuario_data
+    ON recorrencia_execucoes(usuario_id, data_programada DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_recorrencia_data
     ON movimentacoes(recorrencia_id, data) WHERE recorrencia_id IS NOT NULL;

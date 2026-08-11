@@ -8,6 +8,7 @@ import { useCategorias } from "@/hooks/useCategorias";
 import { useToast } from "@/providers/ToastProvider";
 import { financasService } from "@/services/financas.service";
 import type { Cartao } from "@/types/Cartao";
+import { hojeEmSaoPaulo } from "@/lib/date";
 
 interface Props {
   usuarioId: number;
@@ -21,7 +22,7 @@ function criarFormularioInicial() {
     descricao: "",
     valor: "",
     categoria: "",
-    data: new Date().toISOString().slice(0, 10),
+    data: hojeEmSaoPaulo(),
     forma_pagamento: "saldo" as "saldo" | "credito",
     cartao_id: "",
   };
@@ -33,7 +34,7 @@ export default function ScheduledMovementsPanel({ usuarioId, cartoes, onPrograma
   const [formulario, setFormulario] = useState(criarFormularioInicial);
   const { categorias } = useCategorias(formulario.tipo, "financas");
   const { mostrarAviso } = useToast();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeEmSaoPaulo();
 
   function cancelar() {
     setFormulario(criarFormularioInicial());

@@ -8,6 +8,7 @@ import type { Cartao } from "@/types/Cartao";
 import { useToast } from "@/providers/ToastProvider";
 import { useCategorias } from "@/hooks/useCategorias";
 import AppSelect from "@/components/shared/AppSelect";
+import { hojeEmSaoPaulo } from "@/lib/date";
 import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 interface Props {
@@ -39,6 +40,8 @@ export default function EditMovimentacaoModal({
     const [categoria, setCategoria] = useState(
         movimentacao?.categoria ?? ""
     );
+    const [data, setData] = useState(movimentacao?.data?.slice(0, 10) ?? hojeEmSaoPaulo());
+    const [escopoParcelamento, setEscopoParcelamento] = useState<"esta" | "proximas" | "todas">("esta");
     const [quantidade, setQuantidade] = useState(
         movimentacao?.quantidade != null
             ? String(movimentacao.quantidade)
@@ -110,6 +113,7 @@ export default function EditMovimentacaoModal({
         }
 
         const dados: Movimentacao = {
+            ...movimentacao,
             id: movimentacao.id,
             usuario_id: movimentacao.usuario_id,
 
@@ -121,7 +125,7 @@ export default function EditMovimentacaoModal({
 
             categoria,
 
-            data: movimentacao.data,
+            data,
 
             created_at: movimentacao.created_at,
 
@@ -130,6 +134,7 @@ export default function EditMovimentacaoModal({
                 : null,
             forma_pagamento: tipo === "despesa" ? formaPagamento : "saldo",
             cartao_id: tipo === "despesa" && formaPagamento === "credito" ? Number(cartaoId) : null,
+            escopo_parcelamento: movimentacao.grupo_parcelamento ? escopoParcelamento : "esta",
         };
 
         onSalvar(dados);
@@ -183,6 +188,11 @@ export default function EditMovimentacaoModal({
                     {/* DESCRIÇÃO */}
 
                     <div>
+                        <label htmlFor="editar-movimentacao-data" className="mb-2 block text-sm font-medium">Data</label>
+                        <input id="editar-movimentacao-data" type="date" min={movimentacao.pendente ? hojeEmSaoPaulo() : undefined} max={movimentacao.pendente ? undefined : hojeEmSaoPaulo()} value={data} onChange={(event) => setData(event.target.value)} className="control" />
+                    </div>
+
+                    <div>
                         <label htmlFor="editar-movimentacao-descricao" className="mb-2 block text-sm font-medium">
                             Descrição
                         </label>
@@ -224,6 +234,13 @@ export default function EditMovimentacaoModal({
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Quantidade do item na lista de compras.
                             </p>
+                        </div>
+                    )}
+
+                    {movimentacao.grupo_parcelamento && (
+                        <div>
+                            <label htmlFor="editar-escopo-parcelamento" className="mb-2 block text-sm font-medium">Aplicar alteração</label>
+                            <AppSelect id="editar-escopo-parcelamento" value={escopoParcelamento} onValueChange={(value) => setEscopoParcelamento(value as "esta" | "proximas" | "todas")} options={[{ value: "esta", label: "Somente esta parcela" }, { value: "proximas", label: "Esta e as próximas" }, { value: "todas", label: "Todas as parcelas" }]} />
                         </div>
                     )}
 

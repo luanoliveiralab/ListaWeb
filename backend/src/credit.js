@@ -14,8 +14,8 @@ async function buscarCartaoComUso(executor, usuarioId, cartaoId, { bloquear = fa
                           FROM faturas_cartao f
                           WHERE f.cartao_id = m.cartao_id
                             AND f.usuario_id = m.usuario_id
-                            AND f.ano = EXTRACT(YEAR FROM m.data)::integer
-                            AND f.mes = EXTRACT(MONTH FROM m.data)::integer
+                            AND f.ano = COALESCE(m.fatura_ano, EXTRACT(YEAR FROM m.data)::integer)
+                            AND f.mes = COALESCE(m.fatura_mes, EXTRACT(MONTH FROM m.data)::integer)
                             AND f.status = 'paga'
                       )
                 ), 0)::numeric(12,2) AS limite_utilizado

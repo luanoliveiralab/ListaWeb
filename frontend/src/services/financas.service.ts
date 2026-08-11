@@ -20,6 +20,7 @@ export interface AtualizarMovimentacaoDTO {
     data: string;
     forma_pagamento?: "saldo" | "credito";
     cartao_id?: number | null;
+    escopo_parcelamento?: "esta" | "proximas" | "todas";
 }
 
 export const financasService = {
@@ -39,8 +40,20 @@ export const financasService = {
         return api.post("/financas/programar", dados);
     },
 
+    importar(formato: "csv" | "ofx", conteudo: string): Promise<{ movimentacoes: import("@/types/Movimentacao").Movimentacao[]; importadas: number; ignoradas: number }> {
+        return api.post("/financas/importar", { formato, conteudo });
+    },
+
     cancelarProgramacao(id: number) {
         return api.delete(`/financas/programar/${id}`);
+    },
+
+    editarProgramacao(id: number, dados: AtualizarMovimentacaoDTO) {
+        return api.put(`/financas/programar/${id}`, dados);
+    },
+
+    conciliar(id: number, conciliada: boolean) {
+        return api.put(`/financas/${id}/conciliar`, { conciliada });
     },
 
     atualizar(
@@ -50,7 +63,7 @@ export const financasService = {
         return api.put(`/financas/${id}`, dados);
     },
 
-    remover(id: number) {
-        return api.delete(`/financas/${id}`);
+    remover(id: number, escopo: "esta" | "proximas" | "todas" = "esta") {
+        return api.delete(`/financas/${id}?escopo=${escopo}`);
     },
 };
