@@ -24,7 +24,15 @@ export function useAccessibleDialog(aberto: boolean, onFechar: () => void) {
     const painel = panelRef.current;
     const focoAnterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overflowAnterior = document.body.style.overflow;
+    const aplicativo = document.querySelector<HTMLElement>(".app-shell");
+    const ocultarAplicativo = Boolean(aplicativo && painel && !aplicativo.contains(painel));
+    const ariaHiddenAnterior = aplicativo?.getAttribute("aria-hidden");
+    const inertAnterior = aplicativo?.hasAttribute("inert");
     document.body.style.overflow = "hidden";
+    if (ocultarAplicativo && aplicativo) {
+      aplicativo.setAttribute("aria-hidden", "true");
+      aplicativo.setAttribute("inert", "");
+    }
 
     const focar = window.requestAnimationFrame(() => {
       const primeiro = painel?.querySelector<HTMLElement>(FOCUSABLE);
@@ -66,6 +74,12 @@ export function useAccessibleDialog(aberto: boolean, onFechar: () => void) {
       window.cancelAnimationFrame(focar);
       document.removeEventListener("keydown", aoTeclar);
       document.body.style.overflow = overflowAnterior;
+      if (ocultarAplicativo && aplicativo) {
+        if (ariaHiddenAnterior == null) aplicativo.removeAttribute("aria-hidden");
+        else aplicativo.setAttribute("aria-hidden", ariaHiddenAnterior);
+        if (inertAnterior) aplicativo.setAttribute("inert", "");
+        else aplicativo.removeAttribute("inert");
+      }
       focoAnterior?.focus();
     };
   }, [aberto]);

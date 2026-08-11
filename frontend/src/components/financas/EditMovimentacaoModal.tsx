@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { Movimentacao } from "@/types/Movimentacao";
 import type { Cartao } from "@/types/Cartao";
@@ -134,7 +135,7 @@ export default function EditMovimentacaoModal({
         onSalvar(dados);
     }
 
-    return (
+    return createPortal(
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onFechar(); }}>
             <div ref={panelRef} className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="titulo-editar-movimentacao" tabIndex={-1}>
                 <h2 id="titulo-editar-movimentacao" className="mb-6 text-2xl font-bold">
@@ -288,5 +289,5 @@ export default function EditMovimentacaoModal({
                 </div>
             </div>
         </div>
-    );
+    , document.body);
 }
