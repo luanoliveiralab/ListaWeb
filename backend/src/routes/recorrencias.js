@@ -124,7 +124,7 @@ router.post("/gerar", async (req, res, next) => {
              FROM recorrencias WHERE usuario_id = $1 AND ativa = TRUE
                AND make_date($2, $3, dia) >= inicio
                AND (fim IS NULL OR make_date($2, $3, dia) <= fim)
-               AND make_date($2, $3, dia) <= CURRENT_DATE
+               AND make_date($2, $3, dia) = CURRENT_DATE
              ORDER BY dia, id FOR UPDATE`,
             [req.usuarioId, ano, mes]
         );

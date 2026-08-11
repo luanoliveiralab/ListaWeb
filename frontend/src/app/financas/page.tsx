@@ -370,8 +370,12 @@ export default function FinancasPage() {
             pendente: true,
             programada_id: mov.id,
         }));
+    const hojeIso = new Date().toISOString().slice(0, 10);
     const recorrenciasPendentes = recorrencias
-        .filter((recorrencia) => recorrencia.ativa && !movimentacoes.some((mov) => mov.recorrencia_id === recorrencia.id))
+        .filter((recorrencia) => {
+            const dataOcorrencia = `${ano}-${String(mes).padStart(2, "0")}-${String(recorrencia.dia).padStart(2, "0")}`;
+            return recorrencia.ativa && dataOcorrencia >= hojeIso && !movimentacoes.some((mov) => mov.recorrencia_id === recorrencia.id);
+        })
         .map<Movimentacao>((recorrencia) => ({
             id: -1_000_000_000 - recorrencia.id,
             usuario_id: usuario.id,
