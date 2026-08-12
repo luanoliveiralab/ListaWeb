@@ -127,7 +127,7 @@ test("entra e apresenta o resumo financeiro no dashboard", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("Saldo em conta")).toBeVisible();
-  await expect(page.getByText("R$ 4.750,00", { exact: true })).toBeVisible();
+  await expect(page.locator("article").filter({ has: page.getByText("Saldo em conta", { exact: true }) })).toContainText("R$ 4.750,00");
   await expect(page.getByText("Crédito disponível")).toBeVisible();
   await page.waitForTimeout(4000);
   await page.getByRole("button", { name: "Mostrar mensagem 2" }).click();
@@ -289,7 +289,7 @@ test("integra depósitos de metas ao saldo sem distorcer receitas e despesas", a
   await page.goto("/financas");
   await expect(page.getByRole("heading", { name: "Reserva para meta: Reserva" })).toBeVisible();
   await expect(page.getByText("Transferência", { exact: true })).toBeVisible();
-  await expect(page.locator("article").filter({ hasText: /^Saldo/ })).toContainText("R$ 4.450,00");
+  await expect(page.locator("article.surface-interactive").filter({ hasText: /^SaldoR\$/ })).toContainText("R$ 4.450,00");
   await expect(page.locator("article").filter({ hasText: /^Receitas/ })).toContainText("R$ 5.000,00");
   await expect(page.locator("article").filter({ hasText: /^Despesas/ })).toContainText("R$ 250,00");
 });
