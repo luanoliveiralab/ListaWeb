@@ -76,6 +76,14 @@ test("mostra o aviso retornado quando o login falha", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("apresenta o case público do ListaWeb para o portfólio", async ({ page }) => {
+  await page.goto("/projeto-listaweb");
+  await expect(page.getByRole("heading", { name: "Organização financeira que começa no cotidiano." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Um fluxo conectado de ponta a ponta." })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Acessar o ListaWeb/ }).first()).toHaveAttribute("href", "https://listaweb.netlify.app/");
+  await expect(page.getByRole("link", { name: /Voltar ao portfólio/ }).first()).toHaveAttribute("href", "https://weblso.netlify.app/");
+});
+
 test("entra no dashboard imediatamente após criar a conta", async ({ page }) => {
   await prepararApi(page);
   await page.goto("/cadastro");
