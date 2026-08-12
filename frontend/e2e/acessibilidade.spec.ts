@@ -13,10 +13,10 @@ async function esperarSemViolacoesCriticas(page: Page) {
   expect(graves, graves.map((item) => `${item.id}: ${item.help} (${item.nodes.length})`).join("\n")).toEqual([]);
 }
 
-test("login e página Sobre não possuem violações graves", async ({ page }) => {
+test("login e case do projeto não possuem violações graves", async ({ page }) => {
   await page.goto("/");
   await esperarSemViolacoesCriticas(page);
-  await page.goto("/sobre");
+  await page.goto("/projeto-listaweb");
   await esperarSemViolacoesCriticas(page);
 });
 

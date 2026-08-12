@@ -47,20 +47,6 @@ test("exige a leitura e o aceite dos termos antes do cadastro", async ({ page })
   await expect(criarConta).toBeDisabled();
 });
 
-test("apresenta propósito, fases e gratuidade na página Sobre", async ({ page }) => {
-  await page.goto("/sobre");
-  await expect(page.getByRole("heading", { name: /Mais clareza/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Etapas do projeto" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Foto de Luan Oliveira" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "LinkedIn" })).toHaveAttribute("href", "https://www.linkedin.com/in/luanoliveira-ld");
-  await expect(page.getByRole("link", { name: "YouTube" })).toHaveAttribute("href", "https://www.youtube.com/@dev_lso");
-  await page.waitForTimeout(4000);
-  await page.getByRole("button", { name: "Mostrar mensagem 2" }).click();
-  await page.waitForTimeout(4000);
-  await expect(page.getByRole("heading", { name: /Cartões e faturas/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "É 100% gratuito?" })).toBeVisible();
-});
-
 test("mostra o aviso retornado quando o login falha", async ({ page }) => {
   await page.route("http://localhost:3001/**", async (route) => {
     const { pathname } = new URL(route.request().url());
@@ -316,8 +302,10 @@ test("mantém o modal de categorias organizado no desktop e no mobile", async ({
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.goto("/configuracoes");
   await page.getByRole("link", { name: "Conhecer o projeto" }).click();
-  await expect(page).toHaveURL(/\/sobre\?origem=configuracoes$/);
-  await page.getByRole("button", { name: "Voltar" }).click();
+  await expect(page).toHaveURL(/\/projeto-listaweb\?origem=configuracoes$/);
+  const voltarConfiguracoes = page.locator("a:visible").filter({ hasText: /^Voltar$/ }).first();
+  await expect(voltarConfiguracoes).toHaveAttribute("href", "/configuracoes");
+  await voltarConfiguracoes.click();
   await expect(page).toHaveURL(/\/configuracoes$/);
   await page.getByRole("button", { name: "Gerenciar categorias" }).click();
 
