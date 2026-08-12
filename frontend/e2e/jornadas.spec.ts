@@ -8,7 +8,7 @@ test("exibe os acessos públicos da tela de login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "ListaWeb" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute("href", "/esqueci-senha");
   await expect(page.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/cadastro");
-  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/sobre?origem=login");
+  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/projeto-listaweb");
 });
 
 test("permite mostrar e ocultar senhas no login e no cadastro", async ({ page }) => {

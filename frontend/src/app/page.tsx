@@ -144,7 +144,7 @@ export default function LoginPage() {
             Criar conta
           </Link>
         </div>
-        <div className="mt-6 border-t border-border pt-5 text-center"><Link href="/sobre?origem=login" className="text-sm font-medium text-muted-foreground transition hover:text-primary">Sobre o ListaWeb</Link></div>
+        <div className="mt-6 border-t border-border pt-5 text-center"><Link href="/projeto-listaweb" className="text-sm font-medium text-muted-foreground transition hover:text-primary">Sobre o ListaWeb</Link></div>
       </form>
     </div>
   );
