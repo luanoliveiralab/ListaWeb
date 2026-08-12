@@ -8,7 +8,7 @@ test("exibe os acessos públicos da tela de login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "ListaWeb" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute("href", "/esqueci-senha");
   await expect(page.getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/cadastro");
-  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/projeto-listaweb");
+  await expect(page.getByRole("link", { name: "Sobre o ListaWeb" })).toHaveAttribute("href", "/projeto-listaweb?origem=login");
 });
 
 test("permite mostrar e ocultar senhas no login e no cadastro", async ({ page }) => {
@@ -82,6 +82,12 @@ test("apresenta o case público do ListaWeb para o portfólio", async ({ page })
   await expect(page.getByRole("heading", { name: "Um fluxo conectado de ponta a ponta." })).toBeVisible();
   await expect(page.getByRole("link", { name: /Acessar o ListaWeb/ }).first()).toHaveAttribute("href", "https://listaweb.netlify.app/");
   await expect(page.getByRole("link", { name: /Voltar ao portfólio/ }).first()).toHaveAttribute("href", "https://weblso.netlify.app/");
+});
+
+test("retorna ao ListaWeb quando o case foi aberto pelo login", async ({ page }) => {
+  await page.goto("/projeto-listaweb?origem=login");
+  await expect(page.getByRole("link", { name: "Voltar", exact: true }).first()).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Voltar ao portfólio" })).toHaveCount(0);
 });
 
 test("entra no dashboard imediatamente após criar a conta", async ({ page }) => {

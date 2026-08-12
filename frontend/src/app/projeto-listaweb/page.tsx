@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import {
-  ArrowLeft,
   ArrowRight,
   BarChart3,
   CalendarClock,
@@ -17,6 +16,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import ProjectReturnLink from "@/components/about/ProjectReturnLink";
 
 export const metadata: Metadata = {
   title: "ListaWeb — Case do projeto",
@@ -46,11 +46,11 @@ const evolucao = [
   { numero: "03", titulo: "Qualidade como funcionalidade", texto: "Segurança, acessibilidade, testes automatizados e validações fazem parte do produto, não apenas da etapa final." },
 ];
 
-function LinkApp({ secundario = false, className = "" }: { secundario?: boolean; className?: string }) {
-  return <a href={secundario ? PORTFOLIO_URL : APP_URL} className={`${secundario ? "button-secondary" : "button-primary"} ${className}`}>
-    {secundario ? <ArrowLeft size={17} /> : <Rocket size={17} />}
-    {secundario ? "Voltar ao portfólio" : "Acessar o ListaWeb"}
-    {!secundario && <ArrowRight size={16} />}
+function LinkApp({ className = "" }: { className?: string }) {
+  return <a href={APP_URL} className={`button-primary ${className}`}>
+    <Rocket size={17} />
+    Acessar o ListaWeb
+    <ArrowRight size={16} />
   </a>;
 }
 
@@ -71,7 +71,7 @@ export default function ProjetoListaWebPage() {
           </a>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <LinkApp secundario className="hidden sm:inline-flex" />
+            <ProjectReturnLink className="hidden sm:inline-flex" />
           </div>
         </nav>
 
@@ -88,7 +88,7 @@ export default function ProjetoListaWebPage() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <LinkApp className="justify-center" />
-              <LinkApp secundario className="justify-center sm:hidden" />
+              <ProjectReturnLink className="justify-center sm:hidden" />
               <a href="https://github.com/luanoliveiralab/ListaWeb" target="_blank" rel="noopener noreferrer" className="button-secondary justify-center"><Code2 size={17} /> Ver código no GitHub</a>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-muted-foreground">
@@ -151,7 +151,7 @@ export default function ProjetoListaWebPage() {
 
         <section className="relative overflow-hidden rounded-[2rem] bg-foreground px-6 py-14 text-background sm:px-12 sm:py-20">
           <div aria-hidden="true" className="absolute -right-24 -top-24 size-80 rounded-full bg-emerald-400/20 blur-3xl" />
-          <div className="relative mx-auto max-w-3xl text-center"><p className="text-sm font-semibold uppercase tracking-[.18em] text-emerald-400">Explore o projeto</p><h2 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">Veja o ListaWeb funcionando.</h2><p className="mx-auto mt-5 max-w-2xl leading-7 text-background/70">Crie sua conta gratuitamente e experimente a jornada completa, ou retorne ao portfólio para conhecer outros trabalhos.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href={APP_URL} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition hover:-translate-y-0.5"><Rocket size={17} /> Acessar o ListaWeb <ArrowRight size={16} /></a><a href={PORTFOLIO_URL} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-background/20 px-5 py-2.5 text-sm font-semibold text-background transition hover:bg-background/10"><ArrowLeft size={17} /> Voltar ao portfólio</a></div></div>
+          <div className="relative mx-auto max-w-3xl text-center"><p className="text-sm font-semibold uppercase tracking-[.18em] text-emerald-400">Explore o projeto</p><h2 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">Veja o ListaWeb funcionando.</h2><p className="mx-auto mt-5 max-w-2xl leading-7 text-background/70">Crie sua conta gratuitamente e experimente a jornada completa, ou retorne ao portfólio para conhecer outros trabalhos.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href={APP_URL} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition hover:-translate-y-0.5"><Rocket size={17} /> Acessar o ListaWeb <ArrowRight size={16} /></a><ProjectReturnLink contrast /></div></div>
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-4 py-10 text-center text-sm text-muted-foreground sm:flex-row sm:text-left"><p>ListaWeb · Produto e desenvolvimento por Luan Oliveira.</p><a href={PORTFOLIO_URL} className="inline-flex items-center gap-2 font-medium text-foreground hover:underline">weblso.netlify.app <ArrowRight size={14} /></a></footer>
