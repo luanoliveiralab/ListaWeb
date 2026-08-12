@@ -10,6 +10,8 @@ import {
     Search,
     Trash2,
     CircleCheckBig,
+    CheckCircle2,
+    Clock3,
 } from "lucide-react";
 
 import type { Movimentacao } from "@/types/Movimentacao";
@@ -45,7 +47,8 @@ export default function FinanceTable({
 }: Props) {
     const [pesquisa, setPesquisa] = useState("");
     const [filtro, setFiltro] = useState<Filtro>("todas");
-    const [quantidadeVisivel, setQuantidadeVisivel] = useState(30);
+    const [pendentesVisiveis, setPendentesVisiveis] = useState(20);
+    const [lancadasVisiveis, setLancadasVisiveis] = useState(20);
 
     const movimentacoesVisiveis = useMemo(() => {
         const termo = pesquisa.trim().toLocaleLowerCase("pt-BR");
@@ -98,8 +101,12 @@ export default function FinanceTable({
     const realizadas = movimentacoesVisiveis.filter((movimentacao) => !movimentacao.pendente);
     const pendentes = movimentacoesVisiveis.filter((movimentacao) => movimentacao.pendente && !movimentacao.falha_programacao);
     const falhas = movimentacoesVisiveis.filter((movimentacao) => movimentacao.falha_programacao);
-    const movimentacoesAgrupadas = [...realizadas, ...pendentes, ...falhas];
-    const movimentacoesRenderizadas = movimentacoesAgrupadas.slice(0, quantidadeVisivel);
+    const aguardandoLancamento = [...falhas, ...pendentes];
+
+    function reiniciarPaginacao() {
+        setPendentesVisiveis(20);
+        setLancadasVisiveis(20);
+    }
 
     if (loading) {
         return (
@@ -142,7 +149,7 @@ export default function FinanceTable({
                         <input
                             type="search"
                             value={pesquisa}
-                            onChange={(event) => { setPesquisa(event.target.value); setQuantidadeVisivel(30); }}
+                            onChange={(event) => { setPesquisa(event.target.value); reiniciarPaginacao(); }}
                             placeholder="Buscar descrição ou categoria"
                             className="control pl-10"
                             aria-label="Buscar movimentações"
@@ -160,7 +167,7 @@ export default function FinanceTable({
                         <button
                             key={valor}
                             type="button"
-                            onClick={() => { setFiltro(valor); setQuantidadeVisivel(30); }}
+                            onClick={() => { setFiltro(valor); reiniciarPaginacao(); }}
                             aria-pressed={filtro === valor}
                             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                                 filtro === valor
@@ -191,100 +198,66 @@ export default function FinanceTable({
                     </p>
                 </div>
             ) : (
-                <div className="divide-y divide-border">
-                    {movimentacoesRenderizadas.map((movimentacao, index) => {
-                        const receita = movimentacao.tipo === "receita";
-                        const transferencia = movimentacao.impacta_resultado === false;
-
-                        return (
-                            <div key={movimentacao.id}>
-                            {index === 0 && !movimentacao.pendente && <div className="bg-muted/40 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:px-6">Realizadas</div>}
-                            {movimentacao.pendente && !movimentacao.falha_programacao && index === realizadas.length && <div className="flex items-center justify-between bg-amber-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 sm:px-6"><span>Pendentes / futuras</span><span className="normal-case tracking-normal">Ainda não afetam o saldo</span></div>}
-                            {movimentacao.falha_programacao && index === realizadas.length + pendentes.length && <div className="flex items-center justify-between bg-rose-500/5 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300 sm:px-6"><span>Precisam de atenção</span><span className="normal-case tracking-normal">Não foram lançadas</span></div>}
-                            <article
-                                key={movimentacao.id}
-                                className="transaction-row group"
-                                style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
-                            >
-                                <div
-                                    className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
-                                        transferencia
-                                            ? "bg-sky-500/10 text-sky-600"
-                                            : receita
-                                            ? "bg-emerald-500/10 text-emerald-600"
-                                            : "bg-rose-500/10 text-rose-600"
-                                    }`}
-                                >
-                                    {transferencia ? (
-                                        <ArrowLeftRight size={21} />
-                                    ) : receita ? (
-                                        <ArrowUpRight size={21} />
-                                    ) : (
-                                        <ArrowDownRight size={21} />
-                                    )}
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="min-w-0">
-                                            <h3 className="truncate font-medium">
-                                                {movimentacao.descricao}
-                                            </h3>
-                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
-                                                    {movimentacao.categoria}
-                                                </span>
-                                                {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
-                                                {movimentacao.pendente && <span className={`rounded-full px-2.5 py-1 font-medium ${movimentacao.falha_programacao ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{movimentacao.falha_programacao ? "Falhou" : movimentacao.recorrencia_pendente ? "Recorrência" : "Programada"}</span>}
-                                                {!movimentacao.pendente && movimentacao.conciliada && <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-700 dark:text-emerald-300">Conferida</span>}
-                                                {movimentacao.tipo === "despesa" && (
-                                                    <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">
-                                                        {movimentacao.forma_pagamento === "credito"
-                                                            ? `Crédito · ${movimentacao.cartao_nome || "Cartão"}`
-                                                            : "Saldo"}
-                                                    </span>
-                                                )}
-                                                <time dateTime={movimentacao.data}>
-                                                    {new Date(`${movimentacao.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}
-                                                </time>
-                                                {movimentacao.erro_programacao && <span className="font-medium text-rose-600 dark:text-rose-300">{movimentacao.erro_programacao}</span>}
-                                            </div>
-                                        </div>
-
-                                        <strong
-                                            className={`text-base tabular-nums sm:text-right ${
-                                                transferencia ? "text-sky-700 dark:text-sky-300" : receita ? "text-emerald-600" : "text-rose-600"
-                                            }`}
-                                        >
-                                            {receita ? "+" : "−"} {formatarValor(Number(movimentacao.valor))}
-                                        </strong>
+                <div className="grid items-start gap-6 bg-muted/10 p-4 sm:p-6 xl:grid-cols-2">
+                    {[
+                        { titulo: "Pendentes", descricao: "Programadas, recorrentes ou com falha", itens: aguardandoLancamento, limite: pendentesVisiveis, setLimite: setPendentesVisiveis, Icone: Clock3, cor: "text-amber-600", fundo: "bg-amber-500/10" },
+                        { titulo: "Lançadas", descricao: "Já participam do saldo e dos relatórios", itens: realizadas, limite: lancadasVisiveis, setLimite: setLancadasVisiveis, Icone: CheckCircle2, cor: "text-emerald-600", fundo: "bg-emerald-500/10" },
+                    ].map(({ titulo, descricao, itens, limite, setLimite, Icone, cor, fundo }) => (
+                        <section key={titulo} className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+                            <header className="flex items-center justify-between border-b border-border p-5">
+                                <div className="flex items-center gap-3">
+                                    <span className={`flex size-10 items-center justify-center rounded-xl ${fundo} ${cor}`}><Icone size={20} /></span>
+                                    <div>
+                                        <h3 className="font-semibold">{titulo}</h3>
+                                        <p className="text-xs text-muted-foreground">{itens.length} {itens.length === 1 ? "movimentação" : "movimentações"} · {descricao}</p>
                                     </div>
                                 </div>
+                            </header>
 
-                                {!transferencia && !movimentacao.recorrencia_pendente && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                                    {!movimentacao.pendente && <button type="button" onClick={() => onConciliar(movimentacao)} className={`icon-button ${movimentacao.conciliada ? "text-emerald-600" : ""}`} aria-label={`${movimentacao.conciliada ? "Desmarcar conferência de" : "Marcar como conferida"} ${movimentacao.descricao}`} title={movimentacao.conciliada ? "Desmarcar conferência" : "Marcar como conferida"}><CircleCheckBig size={17} /></button>}
-                                    {(!movimentacao.pendente || Boolean(movimentacao.programada_id)) && <button
-                                        type="button"
-                                        onClick={() => onEditar(movimentacao)}
-                                        className="icon-button"
-                                        aria-label={`Editar ${movimentacao.descricao}`}
-                                    >
-                                        <Pencil size={17} />
-                                    </button>}
-                                    <button
-                                        type="button"
-                                        onClick={() => onExcluir(movimentacao.id)}
-                                        className="icon-button hover:text-destructive"
-                                        aria-label={`${movimentacao.pendente ? "Cancelar programação de" : "Excluir"} ${movimentacao.descricao}`}
-                                    >
-                                        <Trash2 size={17} />
-                                    </button>
-                                </div>}
-                            </article>
-                            </div>
-                        );
-                    })}
-                    {quantidadeVisivel < movimentacoesAgrupadas.length && <div className="flex justify-center p-4"><button type="button" className="button-secondary" onClick={() => setQuantidadeVisivel((atual) => atual + 30)}>Mostrar mais {Math.min(30, movimentacoesAgrupadas.length - quantidadeVisivel)}</button></div>}
+                            {itens.length === 0 ? (
+                                <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma movimentação {titulo.toLowerCase()}.</p>
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {itens.slice(0, limite).map((movimentacao, index) => {
+                                        const receita = movimentacao.tipo === "receita";
+                                        const transferencia = movimentacao.impacta_resultado === false;
+                                        return (
+                                            <article key={movimentacao.id} className="transaction-row group" style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}>
+                                                <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${transferencia ? "bg-sky-500/10 text-sky-600" : receita ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                                                    {transferencia ? <ArrowLeftRight size={21} /> : receita ? <ArrowUpRight size={21} /> : <ArrowDownRight size={21} />}
+                                                </div>
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="min-w-0">
+                                                            <h4 className="truncate font-medium">{movimentacao.descricao}</h4>
+                                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                                <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">{movimentacao.categoria}</span>
+                                                                {transferencia && <span className="rounded-full bg-sky-500/10 px-2.5 py-1 font-medium text-sky-700 dark:text-sky-300">Transferência</span>}
+                                                                {movimentacao.pendente && <span className={`rounded-full px-2.5 py-1 font-medium ${movimentacao.falha_programacao ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{movimentacao.falha_programacao ? "Falhou" : movimentacao.recorrencia_pendente ? "Recorrência" : "Programada"}</span>}
+                                                                {!movimentacao.pendente && movimentacao.conciliada && <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-700 dark:text-emerald-300">Conferida</span>}
+                                                                {movimentacao.tipo === "despesa" && <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/80">{movimentacao.forma_pagamento === "credito" ? `Crédito · ${movimentacao.cartao_nome || "Cartão"}` : "Saldo"}</span>}
+                                                                <time dateTime={movimentacao.data}>{new Date(`${movimentacao.data.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR")}</time>
+                                                                {movimentacao.erro_programacao && <span className="font-medium text-rose-600 dark:text-rose-300">{movimentacao.erro_programacao}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <strong className={`text-base tabular-nums sm:text-right ${transferencia ? "text-sky-700 dark:text-sky-300" : receita ? "text-emerald-600" : "text-rose-600"}`}>{receita ? "+" : "−"} {formatarValor(Number(movimentacao.valor))}</strong>
+                                                    </div>
+                                                </div>
+
+                                                {!transferencia && !movimentacao.recorrencia_pendente && <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                                                    {!movimentacao.pendente && <button type="button" onClick={() => onConciliar(movimentacao)} className={`icon-button ${movimentacao.conciliada ? "text-emerald-600" : ""}`} aria-label={`${movimentacao.conciliada ? "Desmarcar conferência de" : "Marcar como conferida"} ${movimentacao.descricao}`} title={movimentacao.conciliada ? "Desmarcar conferência" : "Marcar como conferida"}><CircleCheckBig size={17} /></button>}
+                                                    {(!movimentacao.pendente || Boolean(movimentacao.programada_id)) && <button type="button" onClick={() => onEditar(movimentacao)} className="icon-button" aria-label={`Editar ${movimentacao.descricao}`}><Pencil size={17} /></button>}
+                                                    <button type="button" onClick={() => onExcluir(movimentacao.id)} className="icon-button hover:text-destructive" aria-label={`${movimentacao.pendente ? "Cancelar programação de" : "Excluir"} ${movimentacao.descricao}`}><Trash2 size={17} /></button>
+                                                </div>}
+                                            </article>
+                                        );
+                                    })}
+                                    {limite < itens.length && <div className="flex justify-center p-4"><button type="button" className="button-secondary" onClick={() => setLimite((atual) => atual + 20)}>Mostrar mais {Math.min(20, itens.length - limite)}</button></div>}
+                                </div>
+                            )}
+                        </section>
+                    ))}
                 </div>
             )}
         </section>
