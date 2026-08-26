@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MouseEvent, useTransition } from "react";
+import { MouseEvent, useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { useUsuario } from "@/hooks/useUsuario";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -66,8 +66,23 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [navegando, iniciarNavegacao] = useTransition();
+  const [carregarAvisos, setCarregarAvisos] = useState(false);
   const { usuario } = useUsuario();
-  const { naoLidos } = useNotifications(usuario?.id);
+  const { naoLidos } = useNotifications(usuario?.id, carregarAvisos || pathname === "/avisos");
+
+  useEffect(() => {
+    // O cálculo dos avisos consulta dados de finanças, metas, cartões e
+    // recorrências. Ele não deve disputar recursos com o dashboard logo após
+    // o login; depois que a interface fica disponível, o badge é atualizado.
+    const agendar = window.requestIdleCallback
+      ? (callback: IdleRequestCallback) => window.requestIdleCallback(callback, { timeout: 3_000 })
+      : (callback: IdleRequestCallback) => window.setTimeout(callback, 2_500);
+    const cancelar = window.cancelIdleCallback
+      ? (id: number) => window.cancelIdleCallback(id)
+      : (id: number) => window.clearTimeout(id);
+    const id = agendar(() => setCarregarAvisos(true));
+    return () => cancelar(id);
+  }, []);
 
   function navegar(
     event: MouseEvent<HTMLAnchorElement>,

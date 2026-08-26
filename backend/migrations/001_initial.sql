@@ -257,6 +257,8 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_data
     ON movimentacoes(usuario_id, data DESC);
 CREATE INDEX IF NOT EXISTS idx_listas_usuario
     ON listas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_listas_usuario_created_at
+    ON listas(usuario_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orcamentos_usuario_periodo
     ON orcamentos(usuario_id, ano, mes);
 CREATE INDEX IF NOT EXISTS idx_recorrencias_usuario ON recorrencias(usuario_id, ativa);
@@ -273,6 +275,9 @@ CREATE INDEX IF NOT EXISTS idx_movimentacoes_fatura_pagamento ON movimentacoes(f
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_grupo_parcelamento ON movimentacoes(grupo_parcelamento)
     WHERE grupo_parcelamento IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_cartao_data ON movimentacoes(cartao_id, data DESC);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_usuario_cartao_data
+    ON movimentacoes(usuario_id, cartao_id, data DESC)
+    WHERE forma_pagamento = 'credito';
 CREATE INDEX IF NOT EXISTS idx_movimentacoes_programadas_pendentes
     ON movimentacoes_programadas(usuario_id, data_programada)
     WHERE lancada_em IS NULL;

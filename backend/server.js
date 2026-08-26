@@ -6,8 +6,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 const crypto = require("node:crypto");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const { pool, verificarConexao } = require("./src/db");
 const { enviarEmailRecuperacao, enviarEmailVerificacao } = require("./src/email");
 const { autenticar } = require("./src/middleware/autenticar");
@@ -89,10 +87,6 @@ app.use(protegerCsrf);
 // =====================================================
 // AUTENTICAÇÃO
 // =====================================================
-
-verificarConexao()
-    .then(() => console.log("Banco de dados conectado"))
-    .catch((err) => console.error("Erro ao conectar ao banco:", err.message));
 
 // =====================================================
 // USUÁRIOS
@@ -2809,11 +2803,11 @@ app.use(tratarErro);
 // =====================================================
 
 async function iniciarServidor() {
-    const migracao = await fs.readFile(
-        path.join(__dirname, "migrations/001_initial.sql"),
-        "utf8"
-    );
-    await pool.query(migracao);
+    // As migrações são executadas pelo script `prestart`/`migrate`.
+    // Reexecutá-las aqui atrasava cada reinício do serviço (especialmente
+    // perceptível quando a hospedagem reativa uma instância ociosa).
+    await verificarConexao();
+    console.log("Banco de dados conectado");
     iniciarMotorDeAgendamentos();
 
     app.listen(PORT, () => {
